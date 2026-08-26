@@ -1,0 +1,20 @@
+{
+  "nav_home": "முகப்பு",
+  "nav_lots": "பகுதிகள்",
+  "nav_deliveries": "டெலிவரிகள்",
+  "nav_payments": "கட்டணங்கள்",
+  "select_language": "உங்கள் மொழியைத் தேர்ந்தெடுக்கவும்",
+  "continue": "தொடரவும்",
+  "buyer_review_title": "பகுதியை மதிப்பாய்வு செய்",
+  "back_to_lots": "பகுதிகளுக்குத் திரும்பு",
+  "reject": "நிராகரி",
+  "accept_lot": "ஏற்றுக்கொள்",
+  "settings": "அமைப்புகள்",
+  "language": "மொழி",
+  "change_language": "மொழியை மாற்று",
+  "payment_status": "பணம் செலுத்தும் நிலை",
+  "held": "நிறுத்தி வைக்கப்பட்டுள்ளது",
+  "under_review": "மதிப்பாய்வில்",
+  "released": "வெளியிடப்பட்டது",
+  "contact_support": "ஆதரவைத் தொடர்புகொள்ளவும்"
+}

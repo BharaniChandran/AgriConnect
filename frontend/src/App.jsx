@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import LanguageSelector from './screens/LanguageSelector';
 import BuyerReview from './screens/BuyerReview';
 import LotConfirmation from './screens/LotConfirmation';
 import DisputeNotification from './screens/DisputeNotification';
@@ -8,10 +9,13 @@ import PaymentStatus from './screens/PaymentStatus';
 import RejectionFlow from './screens/RejectionFlow';
 
 function App() {
+  const isLangSet = localStorage.getItem('agriconnect_lang_set');
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/buyer-review" />} />
+        <Route path="/" element={isLangSet ? <Navigate to="/buyer-review" /> : <LanguageSelector />} />
+        <Route path="/language" element={<LanguageSelector />} />
         <Route path="/buyer-review" element={<BuyerReview />} />
         <Route path="/lot-confirmation" element={<LotConfirmation />} />
         <Route path="/dispute-notification" element={<DisputeNotification />} />
