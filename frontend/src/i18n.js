@@ -23,6 +23,7 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
+    lng: localStorage.getItem('i18nextLng') || 'ta',
     ns: ['common'],
     defaultNS: 'common',
     fallbackLng: 'en',
