@@ -1,16 +1,22 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Enum, Text
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Enum, Text, Numeric, Boolean, ARRAY
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from database import Base
 import enum
 import datetime
+import uuid
 
 class TransactionStatus(str, enum.Enum):
     offered = "offered"
     accepted = "accepted"
     in_transit = "in_transit"
     delivered = "delivered"
-    paid = "paid"
     disputed = "disputed"
+    resolved_partial_refund = "resolved_partial_refund"
+    resolved_full_refund = "resolved_full_refund"
+    resolved_buyer_accepts = "resolved_buyer_accepts"
+    resolved_farmer_resale = "resolved_farmer_resale"
+    paid = "paid"
 
 class DisputeReason(str, enum.Enum):
     quality_mismatch = "quality_mismatch"
@@ -24,7 +30,7 @@ class DisputeStatus(str, enum.Enum):
     under_review = "under_review"
     resolved = "resolved"
 
-class ResolutionType(str, enum.Enum):
+class DisputeResolution(str, enum.Enum):
     partial_refund = "partial_refund"
     full_refund = "full_refund"
     buyer_accepts = "buyer_accepts"
@@ -32,42 +38,86 @@ class ResolutionType(str, enum.Enum):
 
 class Farmer(Base):
     __tablename__ = "farmers"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    preferred_language = Column(String, default="en")
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    location = Column(String, nullable=False)
+    phone = Column(String, nullable=False)
+    preferred_language = Column(String, default="ta")
+    is_admin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    lots = relationship("CropLot", back_populates="farmer")
+    transactions = relationship("Transaction", back_populates="farmer", foreign_keys="Transaction.farmer_id")
 
 class Buyer(Base):
     __tablename__ = "buyers"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    preferred_language = Column(String, default="en")
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    location = Column(String, nullable=False)
+    phone = Column(String, nullable=False)
+    preferred_language = Column(String, default="ta")
+    is_admin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    transactions = relationship("Transaction", back_populates="buyer", foreign_keys="Transaction.buyer_id")
+
+class CropLot(Base):
+    __tablename__ = "crops_lots"
+    lot_id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    farmer_id = Column(String, ForeignKey("farmers.id", ondelete="CASCADE"), nullable=False)
+    crop = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False)
+    quality = Column(String, nullable=False)
+    location = Column(String, nullable=False)
+    price_per_kg = Column(Float, nullable=False)
+    status = Column(String, default="available") # available, offered, sold, cancelled
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    farmer = relationship("Farmer", back_populates="lots")
+    transactions = relationship("Transaction", back_populates="lot")
+
+class MarketPrice(Base):
+    __tablename__ = "market_prices"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    market = Column(String, nullable=False, index=True)
+    crop = Column(String, nullable=False, index=True)
+    date = Column(DateTime, nullable=False, index=True)
+    price = Column(Float, nullable=False)
+    arrival = Column(Float, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Transaction(Base):
     __tablename__ = "transactions"
-    id = Column(Integer, primary_key=True, index=True)
-    farmer_id = Column(Integer, ForeignKey("farmers.id"))
-    buyer_id = Column(Integer, ForeignKey("buyers.id"))
-    crop_name = Column(String)
-    quantity_kg = Column(Float)
-    price_per_kg = Column(Float)
-    status = Column(Enum(TransactionStatus), default=TransactionStatus.offered)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    farmer_id = Column(String, ForeignKey("farmers.id"), nullable=False)
+    buyer_id = Column(String, ForeignKey("buyers.id"), nullable=False)
+    lot_id = Column(String, ForeignKey("crops_lots.lot_id"), nullable=True)
+    quantity = Column(Float, nullable=False)
+    price = Column(Float, nullable=False)
+    status = Column(Enum(TransactionStatus), default=TransactionStatus.offered, index=True)
+    payment_status = Column(String, default="pending") # pending, held, refunded_partial, refunded_full, released
+    razorpay_order_id = Column(String, nullable=True)
+    razorpay_payment_id = Column(String, nullable=True)
+    razorpay_refund_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
-    farmer = relationship("Farmer")
-    buyer = relationship("Buyer")
+    farmer = relationship("Farmer", back_populates="transactions", foreign_keys=[farmer_id])
+    buyer = relationship("Buyer", back_populates="transactions", foreign_keys=[buyer_id])
+    lot = relationship("CropLot", back_populates="transactions")
     disputes = relationship("Dispute", back_populates="transaction")
 
 class Dispute(Base):
     __tablename__ = "disputes"
-    dispute_id = Column(Integer, primary_key=True, index=True)
-    transaction_id = Column(Integer, ForeignKey("transactions.id"))
-    raised_by = Column(String) # "buyer" or "farmer"
-    reason = Column(Enum(DisputeReason))
-    description = Column(Text)
-    rejected_quantity_kg = Column(Float)
-    photo_urls = Column(String) # Comma separated for simplicity in SQLite
-    status = Column(Enum(DisputeStatus), default=DisputeStatus.open)
-    resolution = Column(Enum(ResolutionType), nullable=True)
+    dispute_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    transaction_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=False)
+    raised_by = Column(String, nullable=False) # buyer, farmer
+    reason = Column(Enum(DisputeReason), nullable=False)
+    description = Column(Text, nullable=False)
+    rejected_quantity_kg = Column(Float, nullable=False)
+    photo_urls = Column(String, default="") # Comma-separated or JSON string for cross-db compatibility
+    status = Column(Enum(DisputeStatus), default=DisputeStatus.open, index=True)
+    resolution = Column(Enum(DisputeResolution), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     resolved_at = Column(DateTime, nullable=True)
 
