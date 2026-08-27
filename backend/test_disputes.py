@@ -1,102 +1,126 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from main import app, STORE_TRANSACTIONS, STORE_DISPUTES, STORE_USERS, seed_demo_data
+from auth import create_access_token
 
-from main import app, get_db
-from models import Base, TransactionStatus, DisputeReason, DisputeStatus, ResolutionType, Farmer, Buyer, Transaction
-from database import SQLALCHEMY_DATABASE_URL
-
-SQLALCHEMY_DATABASE_URL_TEST = "sqlite:///./test.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL_TEST, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base.metadata.create_all(bind=engine)
-
-def override_get_db():
-    try:
-        db = TestingSessionLocal()
-        yield db
-    finally:
-        db.close()
-
-app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
 
-@pytest.fixture(autouse=True)
-def setup_db():
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    db = TestingSessionLocal()
-    
-    # Create test data
-    farmer = Farmer(name="Test Farmer")
-    buyer = Buyer(name="Test Buyer")
-    db.add_all([farmer, buyer])
-    db.commit()
-    db.refresh(farmer)
-    db.refresh(buyer)
-    
-    # Create transaction
-    tx = Transaction(
-        farmer_id=farmer.id,
-        buyer_id=buyer.id,
-        crop_name="Tomato",
-        quantity_kg=1000,
-        price_per_kg=20,
-        status=TransactionStatus.delivered
-    )
-    db.add(tx)
-    db.commit()
-    db.close()
-    
-    yield
+buyer_token = create_access_token(data={
+    "sub": "buyer-202",
+    "role": "buyer",
+    "name": "Green Grocers Ltd.",
+    "phone": "+919884012345",
+    "preferred_language": "en",
+    "is_admin": False
+})
+buyer_headers = {"Authorization": f"Bearer {buyer_token}"}
 
-def test_reject_transaction_creates_dispute():
-    # Attempt to reject with photos
+admin_token = create_access_token(data={
+    "sub": "admin-999",
+    "role": "admin",
+    "name": "Platform Admin",
+    "phone": "+919999999999",
+    "preferred_language": "en",
+    "is_admin": True
+})
+admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+@pytest.fixture(autouse=True)
+def reset_stores():
+    seed_demo_data()
+
+def test_buyer_reject_lot_success():
+    """Test standard rejection flow creating a dispute."""
     response = client.post("/transactions/1/reject", json={
-        "reason": DisputeReason.spoilage,
-        "description": "Some tomatoes are spoiled",
-        "rejected_quantity_kg": 200,
-        "photo_urls": ["http://test.com/photo1.jpg"]
-    })
+        "reason": "quality_mismatch",
+        "description": "Produce arrived bruised and rotten.",
+        "rejected_quantity_kg": 250.0,
+        "photo_urls": ["https://storage.agriconnect.in/evidence/photo1.jpg"]
+    }, headers=buyer_headers)
     
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == DisputeStatus.open
-    assert data["rejected_quantity_kg"] == 200
-    assert data["photo_urls"] == "http://test.com/photo1.jpg"
+    assert data["transaction_id"] == 1
+    assert data["status"] == "open"
+    assert data["rejected_quantity_kg"] == 250.0
 
-def test_reject_without_photos_fails():
+    # Verify transaction status is now 'disputed'
+    tx = STORE_TRANSACTIONS[1]
+    assert tx["status"] == "disputed"
+    assert tx["payment_status"] == "held" # Payment is held
+
+def test_buyer_reject_lot_missing_photo_fails():
+    """Edge case: quality_mismatch requires at least one photo."""
     response = client.post("/transactions/1/reject", json={
-        "reason": DisputeReason.quality_mismatch,
-        "description": "Bad quality",
-        "rejected_quantity_kg": 100,
-        "photo_urls": []
-    })
+        "reason": "quality_mismatch",
+        "description": "Rotten tomatoes",
+        "rejected_quantity_kg": 200.0,
+        "photo_urls": [] # Empty photos list
+    }, headers=buyer_headers)
     
     assert response.status_code == 400
-    assert "Photos are required" in response.json()["detail"]
+    assert "Evidence photos are mandatory" in response.json()["detail"]
 
-def test_resolve_dispute():
-    # 1. Reject it
-    client.post("/transactions/1/reject", json={
-        "reason": DisputeReason.quantity_mismatch,
-        "description": "Short by 50kg",
-        "rejected_quantity_kg": 50,
+def test_buyer_reject_lot_excess_quantity_fails():
+    """Edge case: Cannot reject more quantity than delivered."""
+    total_qty = STORE_TRANSACTIONS[1]["quantity"]
+    response = client.post("/transactions/1/reject", json={
+        "reason": "wrong_item",
+        "description": "Excess quantity rejected",
+        "rejected_quantity_kg": total_qty + 500.0,
         "photo_urls": []
-    })
+    }, headers=buyer_headers)
     
-    # 2. Resolve it
+    assert response.status_code == 400
+    assert "exceeds total delivered quantity" in response.json()["detail"]
+
+def test_admin_resolve_partial_refund():
+    """Admin resolves dispute with partial refund and remainder payout."""
+    # First reject
+    client.post("/transactions/1/reject", json={
+        "reason": "quantity_mismatch",
+        "description": "Short by 250kg",
+        "rejected_quantity_kg": 250.0,
+        "photo_urls": []
+    }, headers=buyer_headers)
+
+    # Admin resolution
     response = client.post("/transactions/1/dispute/resolve", json={
-        "resolution": ResolutionType.partial_refund
-    })
+        "resolution": "partial_refund"
+    }, headers=admin_headers)
     
     assert response.status_code == 200
-    assert response.json()["resolution"] == ResolutionType.partial_refund
+    data = response.json()
+    assert data["resolution"] == "partial_refund"
+    assert data["transaction_status"] == "paid"
+    assert data["payment_status"] == "refunded_partial"
+
+def test_admin_resolve_full_refund():
+    """Admin resolves dispute with full refund."""
+    client.post("/transactions/1/reject", json={
+        "reason": "wrong_item",
+        "description": "Completely wrong batch",
+        "rejected_quantity_kg": 1250.0,
+        "photo_urls": []
+    }, headers=buyer_headers)
+
+    response = client.post("/transactions/1/dispute/resolve", json={
+        "resolution": "full_refund"
+    }, headers=admin_headers)
     
-    # 3. Check if transaction is paid
-    db = TestingSessionLocal()
-    tx = db.query(Transaction).filter(Transaction.id == 1).first()
-    assert tx.status == TransactionStatus.paid
-    db.close()
+    assert response.status_code == 200
+    data = response.json()
+    assert data["resolution"] == "full_refund"
+    assert data["payment_status"] == "refunded_full"
+
+def test_dispute_timeout_escalation():
+    """Test timeout check endpoint."""
+    client.post("/transactions/1/reject", json={
+        "reason": "other",
+        "description": "Testing escalation",
+        "rejected_quantity_kg": 100.0,
+        "photo_urls": []
+    }, headers=buyer_headers)
+
+    response = client.post("/transactions/1/dispute/timeout-check", headers=admin_headers)
+    assert response.status_code == 200
