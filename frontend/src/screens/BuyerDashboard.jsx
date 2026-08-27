@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '../utils/formatters';
 
 export default function BuyerDashboard() {
-  const { user, token, logout } = useAuth();
+  const { user, token } = useAuth();
+  const { t } = useTranslation('common');
   const [lots, setLots] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const navigate = useNavigate();
@@ -14,33 +17,46 @@ export default function BuyerDashboard() {
   }, []);
 
   const fetchLots = async () => {
-    const res = await fetch('http://localhost:8000/lots', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (res.ok) setLots(await res.json());
+    try {
+      const res = await fetch('http://localhost:8000/lots', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) setLots(await res.json());
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const fetchTransactions = async () => {
-    const res = await fetch('http://localhost:8000/transactions', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (res.ok) setTransactions(await res.json());
+    try {
+      const res = await fetch('http://localhost:8000/transactions', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) setTransactions(await res.json());
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const purchaseLot = async (lotId) => {
-    const res = await fetch('http://localhost:8000/transactions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ lot_id: lotId })
-    });
-    
-    if (res.ok) {
-      alert("Lot purchased successfully! It is now in transit.");
-      fetchLots();
-      fetchTransactions();
+    try {
+      const res = await fetch('http://localhost:8000/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ lot_id: lotId })
+      });
+      
+      if (res.ok) {
+        alert("Lot purchased and payment secured in escrow! Proceeding to tracking.");
+        fetchLots();
+        fetchTransactions();
+        navigate('/buyer-review');
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -49,7 +65,7 @@ export default function BuyerDashboard() {
       <div className="flex justify-between items-end mb-8">
         <div>
           <h1 className="font-display-md text-4xl font-bold text-[#154212] mb-2">Buyer Marketplace</h1>
-          <p className="font-body-md text-[#5B755D]">Browse available crops and manage your deliveries.</p>
+          <p className="font-body-md text-[#5B755D]">Browse fresh verified crops across Tamil Nadu and manage your deliveries.</p>
         </div>
       </div>
       
@@ -59,25 +75,29 @@ export default function BuyerDashboard() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {lots.map(lot => (
-            <div key={lot.id} className="bg-white p-6 rounded-2xl border border-[#E8E2D9] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between group">
+            <div key={lot.lot_id} className="bg-white p-6 rounded-2xl border border-[#E8E2D9] shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between group">
               <div>
                 <div className="flex justify-between items-start mb-4">
-                  <h3 className="font-display-sm text-2xl font-bold text-[#154212] group-hover:text-[#2A6B25] transition-colors">{lot.crop_name}</h3>
-                  <span className="bg-[#EFEBE3] text-[#154212] px-3 py-1 rounded-full font-label-sm font-bold tracking-wider">#{lot.id}</span>
+                  <h3 className="font-display-sm text-2xl font-bold text-[#154212] group-hover:text-[#2A6B25] transition-colors">{lot.crop}</h3>
+                  <span className="bg-[#EFEBE3] text-[#154212] px-3 py-1 rounded-full font-label-sm font-bold tracking-wider">{lot.quality || 'Grade A'}</span>
                 </div>
                 <div className="flex items-center gap-2 text-[#5B755D] mb-4">
                   <span className="material-symbols-outlined text-[18px]">scale</span>
-                  <span className="font-body-md font-medium">{lot.quantity_kg} kg Total</span>
+                  <span className="font-body-md font-medium">{lot.quantity} kg Total</span>
                 </div>
+                <p className="text-[#5B755D] font-body-sm mb-4 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">location_on</span>
+                  {lot.location}
+                </p>
               </div>
               <div className="border-t border-[#E8E2D9] pt-4 mt-auto mb-4">
-                <p className="font-display-sm text-3xl font-bold text-[#154212]">${lot.price_per_kg.toFixed(2)}<span className="font-body-sm text-[#5B755D] font-medium">/kg</span></p>
+                <p className="font-display-sm text-3xl font-bold text-[#154212]">{formatCurrency(lot.price_per_kg)}<span className="font-body-sm text-[#5B755D] font-medium">/kg</span></p>
               </div>
               <button 
-                onClick={() => purchaseLot(lot.id)}
+                onClick={() => purchaseLot(lot.lot_id)}
                 className="w-full bg-[#154212] text-white py-3.5 rounded-xl font-label-lg font-bold hover:bg-[#0E2C14] transition-colors flex items-center justify-center gap-2"
               >
-                Purchase Lot
+                Accept & Place in Escrow
               </button>
             </div>
           ))}
@@ -103,10 +123,10 @@ export default function BuyerDashboard() {
                   <span className="material-symbols-outlined">receipt_long</span>
                 </div>
                 <div>
-                  <h3 className="font-label-lg font-bold text-[#154212]">Order #{tx.id}</h3>
+                  <h3 className="font-label-lg font-bold text-[#154212]">Order #{tx.id} ({formatCurrency(tx.price)})</h3>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="w-2 h-2 rounded-full bg-[#154212]"></span>
-                    <p className="text-[#5B755D] font-label-sm uppercase tracking-wider">{tx.status}</p>
+                    <p className="text-[#5B755D] font-label-sm uppercase tracking-wider">Status: {tx.status} | Escrow: {tx.payment_status}</p>
                   </div>
                 </div>
               </div>
@@ -114,7 +134,7 @@ export default function BuyerDashboard() {
                 onClick={() => navigate(`/buyer-review`)} 
                 className="w-full sm:w-auto text-[#154212] border-2 border-[#154212] hover:bg-[#F7F4F0] px-6 py-2.5 rounded-xl font-label-md font-bold transition-colors"
               >
-                Review Delivery
+                Review Delivery / Raise Dispute
               </button>
             </div>
           ))}
