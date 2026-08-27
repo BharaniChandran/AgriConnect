@@ -1,137 +1,117 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '../utils/formatters';
 
 export default function PaymentStatus() {
-  return (
-    <div className="bg-background min-h-screen flex flex-col">
-      <header className="w-full sticky top-0 z-50 border-b border-outline-earth dark:border-outline-variant flat no-shadows bg-surface-bright dark:bg-surface-dim">
-        <div className="flex justify-between items-center px-mobile-margin md:px-tablet-margin lg:px-0 max-w-max-width-desktop mx-auto h-touch-target">
-          <div className="font-headline-lg-mobile md:font-headline-lg text-primary dark:text-primary-fixed">AgriConnect</div>
-          <nav className="hidden md:flex space-x-gutter">
-            <a className="font-body-md text-body-md md:font-label-lg md:text-label-lg text-on-surface-variant dark:text-outline-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors duration-200 px-3 py-2 rounded-lg" href="#">Home</a>
-            <a className="font-body-md text-body-md md:font-label-lg md:text-label-lg text-on-surface-variant dark:text-outline-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors duration-200 px-3 py-2 rounded-lg" href="#">Lots</a>
-            <a className="font-body-md text-body-md md:font-label-lg md:text-label-lg text-on-surface-variant dark:text-outline-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors duration-200 px-3 py-2 rounded-lg" href="#">Deliveries</a>
-            <a className="font-body-md text-body-md md:font-label-lg md:text-label-lg text-primary dark:text-primary-fixed-dim border-b-2 border-primary dark:border-primary-fixed-dim pb-1 hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors duration-200 px-3 py-2 rounded-lg" href="#">Payments</a>
-          </nav>
-          <div className="flex items-center space-x-4">
-            <button className="active:opacity-80 transition-opacity p-2 rounded-full hover:bg-surface-container-low dark:hover:bg-surface-container-highest">
-              <span className="material-symbols-outlined text-primary dark:text-primary-fixed-dim">language</span>
-            </button>
-            <img alt="User profile photo" className="w-8 h-8 rounded-full object-cover border border-outline-earth" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBgn0DmeErf79eQR1B7eksbWiBr8vZaorxuuNINbhNhBRKZleFsszYI5mu-u2RLroAGbemsPWAGTgRaDZnwuQ4PyED9kxPnJfIDvTyY0utql4F2ta3oQ499c7rBdczva3aHgvU-Hd_7tpco6z3QlLt_9mzyJBjZ-hD345n9TYKdCjCBECLjZnuqOPwu0N_uD4VJAfYCfz2arnWfiB7xVZRP7SM5B88DfnngMlhQgle_IC13damd7b6h" />
-          </div>
-        </div>
-      </header>
+  const { t } = useTranslation('common');
 
-      <main className="flex-grow max-w-max-width-desktop mx-auto px-mobile-margin md:px-tablet-margin py-stack-lg w-full">
-        <div className="mb-stack-lg">
-          <h1 className="font-display-lg text-display-lg text-on-surface">Payment Status</h1>
-          <p className="font-body-lg text-body-lg text-on-surface-variant mt-2">Track the status of your recent lot delivery payment.</p>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
-          <div className="lg:col-span-8 flex flex-col space-y-gutter">
-            <section className="bg-surface-container-lowest border border-outline-earth rounded-xl p-stack-lg relative overflow-hidden shadow-sm">
-              <div className="relative z-10">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h2 className="font-headline-md text-headline-md text-on-surface">Held Amount</h2>
-                    <p className="font-body-md text-body-md text-on-surface-variant mt-1">Payment is currently held pending quality inspection.</p>
-                  </div>
-                  <span className="material-symbols-outlined text-4xl text-secondary-container" style={{fontVariationSettings: "'FILL' 1"}}>lock</span>
-                </div>
-                <div className="mt-stack-md flex items-end space-x-2">
-                  <span className="font-display-lg text-display-lg text-primary">₹1,24,500</span>
-                  <span className="font-body-lg text-body-lg text-on-surface-variant pb-2">.00</span>
-                </div>
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500 w-full">
+      <div className="mb-8">
+        <h1 className="font-display-md text-4xl font-bold text-[#154212]">{t('payment_status') || 'Payment Status'}</h1>
+        <p className="font-body-lg text-[#5B755D] mt-2">{t('manage_account') || 'Track the status of your recent lot delivery payment.'}</p>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-8 flex flex-col space-y-8">
+          <section className="bg-[#154212] rounded-2xl p-8 relative overflow-hidden shadow-md">
+            <div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
+            <div className="relative z-10 flex justify-between items-start">
+              <div>
+                <h2 className="font-display-sm text-2xl font-bold text-white mb-1">{t('held_amount') || 'Held Amount'}</h2>
+                <p className="font-body-md text-[#E8E2D9]">{t('held') || 'Payment is currently held in escrow pending quality verification.'}</p>
               </div>
-            </section>
-            
-            <section className="bg-surface-container-lowest border border-outline-earth rounded-xl p-stack-lg shadow-sm">
-              <h3 className="font-headline-md text-headline-md text-on-surface mb-stack-md">Process Status</h3>
-              <div className="flex flex-col md:flex-row justify-between relative mt-stack-lg">
-                <div className="hidden md:block absolute top-6 left-12 right-12 h-1 bg-surface-variant z-0 rounded-full"></div>
-                <div className="hidden md:block absolute top-6 left-12 w-1/2 h-1 bg-secondary-container z-0 rounded-full"></div>
-                
-                <div className="relative z-10 flex flex-col items-center flex-1 mb-stack-lg md:mb-0">
-                  <div className="w-12 h-12 rounded-full bg-secondary-container text-on-primary flex items-center justify-center shadow-md mb-3 border-2 border-surface-container-lowest">
-                    <span className="material-symbols-outlined">pause_circle</span>
-                  </div>
-                  <span className="font-label-lg text-label-lg text-on-surface text-center">Held</span>
-                  <span className="font-label-md text-label-md text-on-surface-variant text-center mt-1">रोक लिया गया</span>
-                  <span className="font-label-md text-label-md text-outline mt-2 text-center">Oct 24, 10:00 AM</span>
-                </div>
-                
-                <div className="relative z-10 flex flex-col items-center flex-1 mb-stack-lg md:mb-0">
-                  <div className="w-12 h-12 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center shadow-sm mb-3 border-2 border-outline-variant">
-                    <span className="material-symbols-outlined animate-spin-slow">sync</span>
-                  </div>
-                  <span className="font-label-lg text-label-lg text-on-surface text-center">Under Review</span>
-                  <span className="font-label-md text-label-md text-on-surface-variant text-center mt-1">समीक्षाधीन</span>
-                  <span className="font-label-md text-label-md text-outline mt-2 text-center">In Progress</span>
-                </div>
-                
-                <div className="relative z-10 flex flex-col items-center flex-1">
-                  <div className="w-12 h-12 rounded-full bg-surface-variant text-outline flex items-center justify-center mb-3 border-2 border-surface-variant">
-                    <span className="material-symbols-outlined">check_circle</span>
-                  </div>
-                  <span className="font-label-lg text-label-lg text-outline text-center">Released</span>
-                  <span className="font-label-md text-label-md text-outline text-center mt-1">जारी किया गया</span>
-                  <span className="font-label-md text-label-md text-outline mt-2 text-center">Pending</span>
-                </div>
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30">
+                <span className="material-symbols-outlined text-white">lock</span>
               </div>
-              <div className="mt-stack-lg bg-surface-container-low p-stack-md rounded-lg border border-outline-variant">
-                <div className="flex items-start space-x-3">
-                  <span className="material-symbols-outlined text-secondary-container mt-1">info</span>
-                  <div>
-                    <p className="font-body-md text-body-md text-on-surface"><strong>Explanation:</strong> Your payment is currently under review by our quality control team. This usually takes 24-48 hours. Once approved, the funds will be released to your registered account.</p>
-                    <p className="font-body-md text-body-md text-on-surface-variant mt-2"><strong>स्पष्टीकरण:</strong> आपके भुगतान की वर्तमान में हमारी गुणवत्ता नियंत्रण टीम द्वारा समीक्षा की जा रही है। इसमें आमतौर पर 24-48 घंटे लगते हैं। स्वीकृत होने के बाद, धनराशि आपके पंजीकृत खाते में जारी कर दी जाएगी।</p>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
+            </div>
+            <div className="mt-8 relative z-10">
+              <span className="font-display-md text-5xl font-bold text-white tracking-tight">{formatCurrency(124500)}</span>
+            </div>
+          </section>
           
-          <div className="lg:col-span-4 flex flex-col space-y-gutter">
-            <section className="bg-surface-container-lowest border border-outline-earth rounded-xl p-stack-lg shadow-sm">
-              <h3 className="font-headline-md text-headline-md text-on-surface mb-stack-md">Transaction Details</h3>
-              <ul className="space-y-4">
-                <li className="flex justify-between items-center border-b border-outline-variant pb-2">
-                  <span className="font-body-md text-body-md text-on-surface-variant">Lot ID</span>
-                  <span className="font-label-lg text-label-lg text-on-surface">#LOT-8923-A</span>
-                </li>
-                <li className="flex justify-between items-center border-b border-outline-variant pb-2">
-                  <span className="font-body-md text-body-md text-on-surface-variant">Crop Type</span>
-                  <span className="font-label-lg text-label-lg text-on-surface">Premium Wheat</span>
-                </li>
-                <li className="flex justify-between items-center border-b border-outline-variant pb-2">
-                  <span className="font-body-md text-body-md text-on-surface-variant">Quantity</span>
-                  <span className="font-label-lg text-label-lg text-on-surface">5,000 kg</span>
-                </li>
-                <li className="flex justify-between items-center border-b border-outline-variant pb-2">
-                  <span className="font-body-md text-body-md text-on-surface-variant">Base Rate</span>
-                  <span className="font-label-lg text-label-lg text-on-surface">₹24.90 / kg</span>
-                </li>
-                <li className="flex justify-between items-center pt-2">
-                  <span className="font-label-lg text-label-lg text-on-surface">Expected Total</span>
-                  <span className="font-headline-md text-headline-md text-primary">₹1,24,500</span>
-                </li>
-              </ul>
-            </section>
-            
-            <section className="bg-surface-container-lowest border border-outline-earth rounded-xl p-stack-lg shadow-sm">
-              <h3 className="font-headline-md text-headline-md text-on-surface mb-stack-md">Actions</h3>
-              <div className="flex flex-col space-y-3">
-                <button className="w-full bg-primary text-on-primary font-label-lg text-label-lg py-3 rounded-lg shadow-sm hover:bg-primary-container hover:text-on-primary-container active:scale-95 transition-all flex items-center justify-center h-touch-target">
-                  <span className="material-symbols-outlined mr-2">download</span>
-                  Download Receipt
-                </button>
-                <button className="w-full bg-surface-container-lowest border border-primary text-primary font-label-lg text-label-lg py-3 rounded-lg hover:bg-surface-container-low active:scale-95 transition-all flex items-center justify-center h-touch-target">
-                  <span className="material-symbols-outlined mr-2">support_agent</span>
-                  Contact Support
-                </button>
+          <section className="bg-white border border-[#E8E2D9] rounded-2xl p-8 shadow-sm">
+            <h3 className="font-display-sm text-2xl font-bold text-[#154212] mb-8">{t('payment_status') || 'Process Status'}</h3>
+            <div className="flex flex-col md:flex-row justify-between relative mt-8 pt-4">
+              <div className="hidden md:block absolute top-10 left-16 right-16 h-1.5 bg-[#E8E2D9] z-0 rounded-full"></div>
+              <div className="hidden md:block absolute top-10 left-16 w-1/2 h-1.5 bg-[#2A6B25] z-0 rounded-full"></div>
+              
+              <div className="relative z-10 flex flex-col items-center flex-1 mb-8 md:mb-0">
+                <div className="w-14 h-14 rounded-full bg-[#154212] text-white flex items-center justify-center shadow-md mb-4 border-4 border-white">
+                  <span className="material-symbols-outlined text-[24px]">done</span>
+                </div>
+                <span className="font-label-lg font-bold text-[#154212] text-center text-lg">{t('held') || 'Held'}</span>
+                <span className="font-label-sm font-medium text-[#5B755D] mt-2 text-center bg-[#FCFBF9] px-2 py-1 rounded-md border border-[#E8E2D9]">Oct 24, 10:00 AM</span>
               </div>
-            </section>
-          </div>
+              
+              <div className="relative z-10 flex flex-col items-center flex-1 mb-8 md:mb-0">
+                <div className="w-14 h-14 rounded-full bg-white text-[#2A6B25] flex items-center justify-center shadow-md mb-4 border-4 border-[#2A6B25]">
+                  <span className="material-symbols-outlined animate-spin-slow text-[24px]">sync</span>
+                </div>
+                <span className="font-label-lg font-bold text-[#154212] text-center text-lg">{t('under_review') || 'Under Review'}</span>
+                <span className="font-label-sm font-bold text-[#2A6B25] mt-2 text-center bg-[#EFEBE3] px-2 py-1 rounded-md">In Progress</span>
+              </div>
+              
+              <div className="relative z-10 flex flex-col items-center flex-1">
+                <div className="w-14 h-14 rounded-full bg-[#FCFBF9] text-[#C6C0B5] flex items-center justify-center mb-4 border-4 border-[#E8E2D9]">
+                  <span className="material-symbols-outlined text-[24px]">check_circle</span>
+                </div>
+                <span className="font-label-lg font-bold text-[#C6C0B5] text-center text-lg">{t('released') || 'Released'}</span>
+                <span className="font-label-sm font-medium text-[#C6C0B5] mt-2 text-center border border-[#E8E2D9] px-2 py-1 rounded-md">Pending</span>
+              </div>
+            </div>
+            <div className="mt-10 bg-[#FCFBF9] p-6 rounded-xl border border-[#E8E2D9]">
+              <div className="flex items-start space-x-4">
+                <span className="material-symbols-outlined text-[#2A6B25] mt-1 text-[24px]">info</span>
+                <div>
+                  <p className="font-body-md text-[#334D35] leading-relaxed">Your payment of {formatCurrency(124500)} is securely held in escrow. Once delivery acceptance is confirmed or any raised dispute is settled, funds will be released directly via Razorpay.</p>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
-      </main>
+        
+        <div className="lg:col-span-4 flex flex-col space-y-8">
+          <section className="bg-white border border-[#E8E2D9] rounded-2xl p-8 shadow-sm">
+            <h3 className="font-display-sm text-2xl font-bold text-[#154212] mb-6">{t('transaction_details') || 'Transaction Details'}</h3>
+            <ul className="space-y-5">
+              <li className="flex justify-between items-center border-b border-[#E8E2D9] pb-4">
+                <span className="font-label-sm font-bold text-[#5B755D] uppercase tracking-wider">Lot ID</span>
+                <span className="font-label-lg font-bold text-[#154212]">#LOT-8923-A</span>
+              </li>
+              <li className="flex justify-between items-center border-b border-[#E8E2D9] pb-4">
+                <span className="font-label-sm font-bold text-[#5B755D] uppercase tracking-wider">{t('crop_type') || 'Crop Type'}</span>
+                <span className="font-label-lg font-bold text-[#154212]">Tomato (Roma)</span>
+              </li>
+              <li className="flex justify-between items-center border-b border-[#E8E2D9] pb-4">
+                <span className="font-label-sm font-bold text-[#5B755D] uppercase tracking-wider">{t('quantity') || 'Quantity'}</span>
+                <span className="font-label-lg font-bold text-[#154212]">5,000 kg</span>
+              </li>
+              <li className="flex justify-between items-center border-b border-[#E8E2D9] pb-4">
+                <span className="font-label-sm font-bold text-[#5B755D] uppercase tracking-wider">{t('base_rate') || 'Base Rate'}</span>
+                <span className="font-label-lg font-bold text-[#154212]">{formatCurrency(24.9)} / kg</span>
+              </li>
+              <li className="flex justify-between items-center pt-2">
+                <span className="font-display-sm text-xl font-bold text-[#154212]">{t('expected_total') || 'Expected Total'}</span>
+                <span className="font-display-sm text-2xl font-bold text-[#154212]">{formatCurrency(124500)}</span>
+              </li>
+            </ul>
+          </section>
+          
+          <section className="bg-white border border-[#E8E2D9] rounded-2xl p-8 shadow-sm">
+            <h3 className="font-display-sm text-2xl font-bold text-[#154212] mb-6">Actions</h3>
+            <div className="flex flex-col space-y-4">
+              <button className="w-full bg-[#154212] text-white font-label-lg font-bold py-4 rounded-xl shadow-md hover:bg-[#0E2C14] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined">download</span>
+                {t('download_receipt') || 'Download Receipt'}
+              </button>
+              <button className="w-full bg-white border-2 border-[#154212] text-[#154212] font-label-lg font-bold py-4 rounded-xl hover:bg-[#F7F4F0] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined">support_agent</span>
+                {t('contact_support') || 'Contact Support'}
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
