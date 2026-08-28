@@ -191,10 +191,22 @@ export default function FarmerDashboard() {
       console.warn('API lot creation failed, persisting locally:', err);
     }
 
+    const generateUUID = () => {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+
+    const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+    const validLotId = createdLot?.lot_id && isUUID(createdLot.lot_id) ? createdLot.lot_id : generateUUID();
+    const validFarmerId = isUUID(user?.id) ? user.id : 'a0000000-0000-0000-0000-000000000001';
+
     if (!createdLot) {
       createdLot = {
-        lot_id: `lot-${Date.now().toString().slice(-4)}`,
-        farmer_id: user?.id || 'farmer-demo-1',
+        lot_id: validLotId,
+        farmer_id: validFarmerId,
         crop: lotPayload.crop,
         quantity: lotPayload.quantity,
         quality: lotPayload.quality,
@@ -203,6 +215,9 @@ export default function FarmerDashboard() {
         status: 'available',
         created_at: new Date().toISOString()
       };
+    } else {
+      createdLot.lot_id = validLotId;
+      createdLot.farmer_id = validFarmerId;
     }
 
     const currentLocal = getStoredLocalLots();
@@ -210,11 +225,21 @@ export default function FarmerDashboard() {
     setLots(prev => [createdLot, ...prev.filter(l => l.lot_id !== createdLot.lot_id)]);
     setIsPublishing(false);
 
-    // 1. Sync to Supabase crops_lots table directly
+    // 1. Sync to Supabase crops_lots table directly with verified foreign keys
     try {
-      supabase.from('crops_lots').upsert({
-        lot_id: createdLot.lot_id,
-        farmer_id: createdLot.farmer_id || user?.id || 'farmer-1',
+      // First ensure the farmer profile exists in farmers table
+      await supabase.from('farmers').upsert({
+        id: validFarmerId,
+        name: user?.name || 'Farmer',
+        location: createdLot.location || 'Nashik, Maharashtra',
+        phone: user?.phone || '+919822123456',
+        preferred_language: 'mr'
+      });
+
+      // Then insert the lot
+      const { error: upsertErr } = await supabase.from('crops_lots').upsert({
+        lot_id: validLotId,
+        farmer_id: validFarmerId,
         crop: createdLot.crop,
         quantity: parseFloat(createdLot.quantity),
         quality: createdLot.quality || 'Grade A',
@@ -222,9 +247,11 @@ export default function FarmerDashboard() {
         price_per_kg: parseFloat(createdLot.price_per_kg),
         status: 'available',
         created_at: createdLot.created_at || new Date().toISOString()
-      }).then(({ error }) => {
-        if (error) console.warn('Supabase lot upsert note:', error);
       });
+
+      if (upsertErr) {
+        console.warn('Supabase lot upsert note:', upsertErr);
+      }
     } catch (sbUpsertErr) {
       console.warn('Supabase upsert note:', sbUpsertErr);
     }
