@@ -512,15 +512,20 @@ export default function FarmerDashboard() {
                 }}
                 className="w-full p-3.5 border border-[#E8E2D9] rounded-xl bg-[#FCFBF9] focus:bg-white focus:border-[#154212] outline-none font-medium text-[#154212]"
               >
-                <option value="Nashik APMC Mandi, Maharashtra">Nashik APMC, Maharashtra</option>
-                <option value="Pune APMC Market Yard, Maharashtra">Pune APMC, Maharashtra</option>
-                <option value="Vashi APMC Navi Mumbai, Maharashtra">Vashi APMC Navi Mumbai</option>
-                <option value="Nagpur Kalamna APMC, Maharashtra">Nagpur Kalamna APMC</option>
-                <option value="Kolhapur Shahu APMC, Maharashtra">Kolhapur APMC</option>
-                <option value="Ahmednagar APMC, Maharashtra">Ahmednagar APMC</option>
-                <option value="Lasalgaon Onion Mandi, Nashik">Lasalgaon Mandi, Nashik</option>
-                <option value="Oddanchatram Mandi, Dindigul">Oddanchatram, Dindigul</option>
-                <option value="Koyambedu Wholesale Market, Chennai">Koyambedu, Chennai</option>
+                <option value="Nashik APMC Mandi, Maharashtra">Nashik APMC Mandi, Maharashtra</option>
+                <option value="Pimpalgaon Baswant APMC, Nashik, Maharashtra">Pimpalgaon Baswant APMC, Nashik</option>
+                <option value="Lasalgaon Onion Mandi, Nashik, Maharashtra">Lasalgaon Onion Mandi, Nashik</option>
+                <option value="Pune APMC Market Yard (Gultekdi), Maharashtra">Pune APMC Market Yard, Maharashtra</option>
+                <option value="Vashi APMC Navi Mumbai, Maharashtra">Vashi APMC, Navi Mumbai, Maharashtra</option>
+                <option value="Kolhapur Shahu APMC, Maharashtra">Kolhapur Shahu APMC, Maharashtra</option>
+                <option value="Ahmednagar APMC, Maharashtra">Ahmednagar APMC, Maharashtra</option>
+                <option value="Solapur Siddheshwar APMC, Maharashtra">Solapur Siddheshwar APMC, Maharashtra</option>
+                <option value="Nagpur Kalamna APMC, Maharashtra">Nagpur Kalamna APMC, Maharashtra</option>
+                <option value="Jalgaon APMC (Banana & Agro Hub), Maharashtra">Jalgaon APMC, Maharashtra</option>
+                <option value="Sangli Turmeric & Spices APMC, Maharashtra">Sangli Spices APMC, Maharashtra</option>
+                <option value="Chhatrapati Sambhajinagar (Aurangabad) APMC, Maharashtra">Chhatrapati Sambhajinagar APMC, Maharashtra</option>
+                <option value="Satara APMC, Maharashtra">Satara APMC, Maharashtra</option>
+                <option value="Amravati APMC, Maharashtra">Amravati APMC, Maharashtra</option>
               </select>
             </div>
 
@@ -540,9 +545,9 @@ export default function FarmerDashboard() {
               >
                 <option value="50">50 km (Local Cluster)</option>
                 <option value="100">100 km (Regional Mandis)</option>
-                <option value="150">150 km (Adjacent Districts)</option>
-                <option value="250">250 km (Wide Radius)</option>
-                <option value="500">500 km (All Mandis)</option>
+                <option value="150">150 km (Adjacent Maharashtra Districts)</option>
+                <option value="250">250 km (Western / Central Maharashtra)</option>
+                <option value="500">500 km (All Maharashtra APMCs)</option>
               </select>
             </div>
           </div>

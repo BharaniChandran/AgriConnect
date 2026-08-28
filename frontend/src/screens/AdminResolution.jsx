@@ -119,7 +119,7 @@ export default function AdminResolution() {
             <div className="mb-8">
               <h3 className="font-label-sm font-bold text-[#5B755D] uppercase tracking-wider mb-3">Rebuttal / Statement</h3>
               <p className="font-body-md text-[#334D35] bg-[#FCFBF9] p-5 rounded-xl border border-[#E8E2D9] leading-relaxed">
-                The shipment was dispatched on time according to the Mandi schedule. The delay was due to highway logistics. Produce was graded 'Grade A' upon departure from Oddanchatram.
+                The shipment was dispatched on time according to the Mandi schedule. The delay was due to highway logistics. Produce was graded 'Grade A' upon departure from Pimpalgaon APMC, Nashik.
               </p>
             </div>
             <div className="mb-8">
