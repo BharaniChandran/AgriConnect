@@ -7,11 +7,14 @@ import { API_BASE_URL } from '../apiConfig';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(() => localStorage.getItem('agriconnect_token'));
+  const [token, setToken] = useState(() => {
+    const t = localStorage.getItem('agriconnect_token');
+    return (t && t !== 'undefined' && t !== 'null' && t.trim() !== '') ? t.trim() : null;
+  });
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('agriconnect_user');
     try {
-      return savedUser ? JSON.parse(savedUser) : null;
+      return (savedUser && savedUser !== 'undefined' && savedUser !== 'null') ? JSON.parse(savedUser) : null;
     } catch {
       return null;
     }
@@ -46,8 +49,8 @@ export const AuthProvider = ({ children }) => {
         if (userData.preferred_language) {
           i18n.changeLanguage(userData.preferred_language);
         }
-      } else if (response.status === 401) {
-        // Only clear if token is genuinely rejected
+      } else if (response.status === 401 || response.status === 403) {
+        // Token is invalid/expired
         logout();
       }
     } catch (error) {
@@ -57,23 +60,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (phoneOrEmail, password) => {
-    setErrorState(null);
-    const identifier = phoneOrEmail.trim();
+  const getErrorMessage = (errData, fallback) => {
+    if (!errData) return fallback;
+    if (typeof errData.detail === 'string') return errData.detail;
+    if (Array.isArray(errData.detail)) {
+      return errData.detail.map((d) => d.msg || d.message || JSON.stringify(d)).join(', ');
+    }
+    return errData.message || fallback;
+  };
 
-    // 1. Authenticate with Supabase client directly if valid email
-    if (identifier.includes('@')) {
-      try {
-        await supabase.auth.signInWithPassword({
-          email: identifier,
-          password: password
-        });
-      } catch (sbErr) {
-        console.warn('Supabase client sign-in note:', sbErr);
-      }
+  const login = async (phoneOrEmail, password) => {
+    const identifier = (phoneOrEmail || '').trim();
+    if (!identifier) {
+      return { success: false, error: 'Please enter your phone number or email address' };
     }
 
-    // 2. Authenticate with Backend API
+    let backendSuccess = false;
+    let loggedInUser = null;
+    let backendError = null;
+
+    // 1. Authenticate with Backend API
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
@@ -93,49 +99,88 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('agriconnect_token', data.access_token);
         
         if (data.user) {
+          loggedInUser = data.user;
           setUser(data.user);
           localStorage.setItem('agriconnect_user', JSON.stringify(data.user));
           if (data.user.preferred_language) {
             i18n.changeLanguage(data.user.preferred_language);
           }
         }
-        setLoading(false);
-        return { success: true, user: data.user };
+        backendSuccess = true;
       } else {
         const errData = await response.json().catch(() => ({}));
-        return { success: false, error: errData.detail || 'Invalid email or password' };
+        backendError = getErrorMessage(errData, 'Invalid email/phone or password');
       }
     } catch (e) {
-      console.error('Login network error:', e);
-      return { success: false, error: 'Unable to connect to server. Please check your connection.' };
+      console.warn('Backend login network note:', e);
+      backendError = 'Unable to connect to server';
     }
+
+    if (backendSuccess) {
+      // Sync Supabase client if email
+      if (identifier.includes('@')) {
+        try {
+          await supabase.auth.signInWithPassword({
+            email: identifier,
+            password: password
+          });
+        } catch (sbErr) {
+          console.warn('Supabase client sign-in note:', sbErr);
+        }
+      }
+      setLoading(false);
+      return { success: true, user: loggedInUser };
+    }
+
+    // 2. Direct Supabase Client Login Fallback
+    if (identifier.includes('@')) {
+      try {
+        const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
+          email: identifier,
+          password: password
+        });
+
+        if (!sbError && sbData?.user && sbData?.session) {
+          const meta = sbData.user.user_metadata || {};
+          const fallbackUser = {
+            id: sbData.user.id,
+            name: meta.name || 'Agri User',
+            location: meta.location || 'Nashik, Maharashtra',
+            phone: meta.phone || identifier,
+            email: sbData.user.email || identifier,
+            preferred_language: meta.preferred_language || i18n.language || 'mr',
+            role: meta.role || 'farmer',
+            is_admin: meta.is_admin || meta.role === 'admin'
+          };
+          setToken(sbData.session.access_token);
+          localStorage.setItem('agriconnect_token', sbData.session.access_token);
+          setUser(fallbackUser);
+          localStorage.setItem('agriconnect_user', JSON.stringify(fallbackUser));
+          setLoading(false);
+          return { success: true, user: fallbackUser };
+        } else if (sbError) {
+          return { success: false, error: sbError.message || backendError || 'Invalid email/phone or password' };
+        }
+      } catch (sbEx) {
+        console.warn('Supabase fallback sign-in error:', sbEx);
+      }
+    }
+
+    setLoading(false);
+    return { success: false, error: backendError || 'Invalid email/phone or password' };
   };
 
   const register = async (userData) => {
     const identifier = (userData.email || userData.phone || '').trim();
-
-    // 1. Sign up on Supabase Auth
-    if (userData.email && userData.email.includes('@')) {
-      try {
-        await supabase.auth.signUp({
-          email: userData.email.trim(),
-          password: userData.password,
-          options: {
-            data: {
-              name: userData.name,
-              role: userData.role || 'farmer',
-              phone: userData.phone || '',
-              location: userData.location || 'Nashik, Maharashtra',
-              preferred_language: i18n.language || 'mr'
-            }
-          }
-        });
-      } catch (sbErr) {
-        console.warn('Supabase direct signup note:', sbErr);
-      }
+    if (!identifier) {
+      return { success: false, error: 'Please enter your phone number or email address' };
     }
 
-    // 2. Register on Backend API & database
+    let backendSuccess = false;
+    let registeredUser = null;
+    let backendError = null;
+
+    // 1. Try Backend API Registration first
     try {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
@@ -143,7 +188,7 @@ export const AuthProvider = ({ children }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: userData.name,
+          name: userData.name || 'Agri User',
           phone_or_email: identifier,
           password_or_otp: userData.password,
           role: userData.role || 'farmer',
@@ -158,22 +203,120 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('agriconnect_token', data.access_token);
         
         if (data.user) {
+          registeredUser = data.user;
           setUser(data.user);
           localStorage.setItem('agriconnect_user', JSON.stringify(data.user));
           if (data.user.preferred_language) {
             i18n.changeLanguage(data.user.preferred_language);
           }
         }
-        setLoading(false);
-        return { success: true, user: data.user };
+        backendSuccess = true;
       } else {
         const errData = await response.json().catch(() => ({}));
-        return { success: false, error: errData.detail || 'Registration failed' };
+        backendError = getErrorMessage(errData, 'Registration failed');
       }
-    } catch (e) {
-      console.error('Registration network error:', e);
-      return { success: false, error: 'Registration failed due to network error.' };
+    } catch (apiErr) {
+      console.warn('Backend API register note:', apiErr);
+      backendError = 'Unable to connect to backend server';
     }
+
+    // 2. If Backend API succeeded, attempt Supabase client sign-up / sign-in
+    if (backendSuccess) {
+      if (identifier.includes('@')) {
+        try {
+          await supabase.auth.signUp({
+            email: identifier,
+            password: userData.password,
+            options: {
+              data: {
+                name: userData.name || 'Agri User',
+                role: userData.role || 'farmer',
+                location: userData.location || 'Nashik, Maharashtra',
+                phone: identifier,
+                preferred_language: i18n.language || 'mr'
+              }
+            }
+          });
+        } catch (sbErr) {
+          console.warn('Supabase post-register note:', sbErr);
+        }
+      }
+      setLoading(false);
+      return { success: true, user: registeredUser };
+    }
+
+    // 3. Fallback: Direct Supabase Authentication if backend API was unreachable / failed
+    if (identifier.includes('@')) {
+      try {
+        const { data: sbData, error: sbError } = await supabase.auth.signUp({
+          email: identifier,
+          password: userData.password,
+          options: {
+            data: {
+              name: userData.name || 'Agri User',
+              role: userData.role || 'farmer',
+              location: userData.location || 'Nashik, Maharashtra',
+              phone: identifier,
+              preferred_language: i18n.language || 'mr'
+            }
+          }
+        });
+
+        if (sbError) {
+          // If already registered, try signing in with that password
+          if (sbError.message && sbError.message.toLowerCase().includes('already registered')) {
+            const { data: loginData, error: loginErr } = await supabase.auth.signInWithPassword({
+              email: identifier,
+              password: userData.password
+            });
+            if (!loginErr && loginData?.session) {
+              const fallbackUser = {
+                id: loginData.user.id,
+                name: userData.name || 'Agri User',
+                location: userData.location || 'Nashik, Maharashtra',
+                phone: identifier,
+                email: identifier,
+                preferred_language: i18n.language || 'mr',
+                role: userData.role || 'farmer',
+                is_admin: userData.role === 'admin'
+              };
+              setToken(loginData.session.access_token);
+              localStorage.setItem('agriconnect_token', loginData.session.access_token);
+              setUser(fallbackUser);
+              localStorage.setItem('agriconnect_user', JSON.stringify(fallbackUser));
+              setLoading(false);
+              return { success: true, user: fallbackUser };
+            }
+          }
+          return { success: false, error: sbError.message || backendError || 'Registration failed' };
+        }
+
+        if (sbData?.user) {
+          const fallbackUser = {
+            id: sbData.user.id,
+            name: userData.name || 'Agri User',
+            location: userData.location || 'Nashik, Maharashtra',
+            phone: identifier,
+            email: identifier,
+            preferred_language: i18n.language || 'mr',
+            role: userData.role || 'farmer',
+            is_admin: userData.role === 'admin'
+          };
+          const fallbackToken = sbData.session?.access_token || `mock_token_${sbData.user.id}`;
+          setToken(fallbackToken);
+          localStorage.setItem('agriconnect_token', fallbackToken);
+          setUser(fallbackUser);
+          localStorage.setItem('agriconnect_user', JSON.stringify(fallbackUser));
+          setLoading(false);
+          return { success: true, user: fallbackUser };
+        }
+      } catch (directErr) {
+        console.error('Supabase direct auth error:', directErr);
+      }
+    }
+
+    setLoading(false);
+    return { success: false, error: backendError || 'Registration failed. Email or phone may already be in use.' };
   };
 
   const logout = async () => {
@@ -189,8 +332,6 @@ export const AuthProvider = ({ children }) => {
     navigate('/login');
   };
 
-  const [errorState, setErrorState] = useState(null);
-
   return (
     <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
       {children}
@@ -199,3 +340,4 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+

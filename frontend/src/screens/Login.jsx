@@ -11,11 +11,11 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = await login(email, password);
-    if (success) {
-      navigate('/'); // Go to dashboard based on role later
+    const res = await login(email, password);
+    if (res && res.success) {
+      navigate('/');
     } else {
-      setError('Invalid credentials');
+      setError(res?.error || 'Invalid credentials');
     }
   };
 

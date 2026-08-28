@@ -16,6 +16,7 @@ class UserProfileResponse(BaseModel):
     name: str
     location: str
     phone: str
+    email: Optional[str] = ""
     preferred_language: str
     role: str
     is_admin: bool = False

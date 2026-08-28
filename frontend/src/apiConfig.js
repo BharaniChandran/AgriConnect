@@ -1,10 +1,7 @@
 /**
  * Unified API Base URL Configuration for Multi-Device & Public Internet Access.
- * - When accessed locally (localhost): talks directly to http://localhost:8000
- * - When accessed from other networks / mobile data / public tunnel: routes via Vite proxy at /api
+ * - Defaults to '/api' which leverages Vite's dev proxy locally and Vercel/production serverless routing.
+ * - Falls back to VITE_API_URL if explicitly overridden.
  */
 export const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-    ? `${window.location.origin}/api`
-    : 'http://localhost:8000');
+  import.meta.env.VITE_API_URL || '/api';

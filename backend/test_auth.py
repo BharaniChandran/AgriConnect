@@ -68,3 +68,92 @@ def test_register_and_login_full_flow():
     tx_data = response.json()
     assert tx_data["status"] == "in_transit"
     assert tx_data["payment_status"] == "held"
+
+def test_email_registration_and_login():
+    # Register with email
+    reg_res = client.post("/auth/register", json={
+        "name": "Anand Organic Exports",
+        "phone_or_email": "anand.trader@agriconnect.in",
+        "password_or_otp": "SecurePass2026!",
+        "role": "buyer",
+        "location": "Pune APMC, Maharashtra",
+        "preferred_language": "en"
+    })
+    assert reg_res.status_code == 200
+    assert "access_token" in reg_res.json()
+    assert reg_res.json()["user"]["email"] == "anand.trader@agriconnect.in"
+
+    # Login with email
+    login_res = client.post("/auth/login", json={
+        "phone_or_email": "anand.trader@agriconnect.in",
+        "password_or_otp": "SecurePass2026!"
+    })
+    assert login_res.status_code == 200
+    assert login_res.json()["user"]["role"] == "buyer"
+
+def test_login_invalid_password():
+    # Register user
+    client.post("/auth/register", json={
+        "name": "Kailas Patil",
+        "phone_or_email": "+919833001122",
+        "password_or_otp": "MySecretPass999",
+        "role": "farmer"
+    })
+    
+    # Try invalid password
+    bad_login = client.post("/auth/login", json={
+        "phone_or_email": "+919833001122",
+        "password_or_otp": "TotallyWrongPassword"
+    })
+    assert bad_login.status_code == 401
+    assert "Invalid" in bad_login.json()["detail"]
+
+def test_login_unregistered_user():
+    bad_login = client.post("/auth/login", json={
+        "phone_or_email": "+919999000099",
+        "password_or_otp": "AnyPassword"
+    })
+    assert bad_login.status_code == 401
+    assert "Account not found" in bad_login.json()["detail"]
+
+def test_demo_quick_logins():
+    # Farmer quick login
+    f_res = client.post("/auth/login", json={
+        "phone_or_email": "+919822123456",
+        "password_or_otp": "password123"
+    })
+    assert f_res.status_code == 200
+    assert f_res.json()["user"]["role"] == "farmer"
+
+    # Buyer quick login
+    b_res = client.post("/auth/login", json={
+        "phone_or_email": "+919820012345",
+        "password_or_otp": "password123"
+    })
+    assert b_res.status_code == 200
+    assert b_res.json()["user"]["role"] == "buyer"
+
+    # Admin quick login
+    a_res = client.post("/auth/login", json={
+        "phone_or_email": "+919999999999",
+        "password_or_otp": "admin123"
+    })
+    assert a_res.status_code == 200
+    assert a_res.json()["user"]["role"] == "admin"
+
+def test_session_validation_me():
+    # Login as demo farmer
+    f_res = client.post("/auth/login", json={
+        "phone_or_email": "+919822123456",
+        "password_or_otp": "password123"
+    })
+    token = f_res.json()["access_token"]
+
+    # Validate /auth/me with valid token
+    me_res = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_res.status_code == 200
+    assert me_res.json()["phone"] == "+919822123456"
+
+    # Validate /auth/me with invalid token
+    bad_me = client.get("/auth/me", headers={"Authorization": "Bearer invalid_gibberish_token"})
+    assert bad_me.status_code == 401

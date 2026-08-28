@@ -19,11 +19,11 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = await register(formData);
-    if (success) {
+    const res = await register(formData);
+    if (res && res.success) {
       navigate('/');
     } else {
-      setError('Registration failed. Email might be in use.');
+      setError(res?.error || 'Registration failed. Email or phone might already be in use.');
     }
   };
 

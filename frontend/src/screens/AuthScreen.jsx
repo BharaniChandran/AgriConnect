@@ -38,18 +38,31 @@ export default function AuthScreen({ initialTab = 'login' }) {
     
     if (activeTab === 'login') {
       const result = await login(formData.email, formData.password);
-      if (result.success) {
+      if (result && result.success) {
         navigate('/', { replace: true });
       } else {
-        setError(result.error || 'Invalid email or password');
+        setError(result?.error || 'Invalid email/phone or password');
       }
     } else {
       const result = await register(formData);
-      if (result.success) {
+      if (result && result.success) {
         navigate('/', { replace: true });
       } else {
-        setError(result.error || 'Registration failed. Email or phone may already be registered.');
+        setError(result?.error || 'Registration failed. Email or phone may already be in use.');
       }
+    }
+    setLoading(false);
+  };
+
+  const handleQuickLogin = async (phoneOrEmail, password, role) => {
+    setError('');
+    setLoading(true);
+    setFormData((prev) => ({ ...prev, email: phoneOrEmail, password, role }));
+    const result = await login(phoneOrEmail, password);
+    if (result && result.success) {
+      navigate('/', { replace: true });
+    } else {
+      setError(result?.error || `Failed to sign in as ${role}`);
     }
     setLoading(false);
   };
@@ -64,7 +77,7 @@ export default function AuthScreen({ initialTab = 'login' }) {
           <span className="font-display-sm text-[22px] font-bold tracking-tight text-[#154212]">AgriConnect</span>
         </div>
         <div className="text-xs text-[#5B755D] font-bold uppercase tracking-wider bg-[#EFEBE3] px-3 py-1.5 rounded-full border border-[#E8E2D9]">
-          Secure Production Portal
+          Maharashtra APMC Pilot
         </div>
       </header>
       
@@ -81,27 +94,69 @@ export default function AuthScreen({ initialTab = 'login' }) {
             <h2 className="font-display-md text-[#154212] leading-tight mb-3 font-bold text-2xl">
               Maharashtra APMC Marketplace
             </h2>
-            <p className="font-body-md text-[#334D35] leading-relaxed">
+            <p className="font-body-md text-[#334D35] leading-relaxed mb-4">
               Connect directly with verified buyers, track real-time MSAMB mandi arrivals, predict crop prices, and secure escrow payouts.
             </p>
+            <div className="flex flex-wrap gap-2 text-xs font-bold text-[#154212]">
+              <span className="bg-[#E4ECE3] px-2.5 py-1 rounded-md">✓ Direct Trading</span>
+              <span className="bg-[#E4ECE3] px-2.5 py-1 rounded-md">✓ Escrow Protected</span>
+              <span className="bg-[#E4ECE3] px-2.5 py-1 rounded-md">✓ MSAMB Mandi Rates</span>
+            </div>
           </div>
         </div>
 
         {/* Right Side - Form */}
         <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 md:p-12 bg-[#FCFBF9] overflow-y-auto">
-          <div className="w-full max-w-[420px] py-4">
+          <div className="w-full max-w-[440px] py-4">
             
-            <div className="text-center mb-8">
+            <div className="text-center mb-6">
               <h1 className="font-display-md text-[#154212] font-bold text-3xl mb-2">
                 {activeTab === 'login' ? 'Welcome Back' : 'Create Your Account'}
               </h1>
               <p className="font-body-md text-[#5B755D]">
-                {activeTab === 'login' ? 'Sign in to access your dashboard' : 'Join AgriConnect to trade across Maharashtra APMCs'}
+                {activeTab === 'login' ? 'Sign in to access your agricultural dashboard' : 'Join AgriConnect to trade across Maharashtra APMCs'}
               </p>
             </div>
 
+            {/* Quick Demo Login Cards */}
+            <div className="mb-6 bg-[#EFEBE3]/70 border border-[#E8E2D9] rounded-xl p-3.5">
+              <div className="text-[11px] font-bold text-[#5B755D] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-[#154212]">bolt</span>
+                <span>Instant Demo Access</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => handleQuickLogin('+919822123456', 'password123', 'farmer')}
+                  className="bg-white border border-[#D5DDD4] hover:border-[#154212] hover:bg-[#F2F7F2] p-2 rounded-lg text-center transition-all text-xs font-bold text-[#154212] flex flex-col items-center gap-1 shadow-2xs"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-[#154212]">agriculture</span>
+                  <span>Farmer</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => handleQuickLogin('+919820012345', 'password123', 'buyer')}
+                  className="bg-white border border-[#D5DDD4] hover:border-[#154212] hover:bg-[#F2F7F2] p-2 rounded-lg text-center transition-all text-xs font-bold text-[#154212] flex flex-col items-center gap-1 shadow-2xs"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-[#154212]">storefront</span>
+                  <span>Buyer</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => handleQuickLogin('+919999999999', 'admin123', 'admin')}
+                  className="bg-white border border-[#D5DDD4] hover:border-[#154212] hover:bg-[#F2F7F2] p-2 rounded-lg text-center transition-all text-xs font-bold text-[#154212] flex flex-col items-center gap-1 shadow-2xs"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-[#154212]">admin_panel_settings</span>
+                  <span>Admin</span>
+                </button>
+              </div>
+            </div>
+
             {/* Tabs */}
-            <div className="flex w-full mb-6 border-b border-[#E8E2D9]">
+            <div className="flex w-full mb-5 border-b border-[#E8E2D9]">
               <button 
                 type="button"
                 onClick={() => handleTabSwitch('login')}
@@ -198,13 +253,13 @@ export default function AuthScreen({ initialTab = 'login' }) {
 
               <div>
                 <label className="block text-xs font-bold text-[#334D35] uppercase mb-1">
-                  {activeTab === 'login' ? 'Email or Phone' : 'Email Address'}
+                  {activeTab === 'login' ? 'Email or Mobile Number' : 'Email or Mobile Number'}
                 </label>
                 <div className="relative">
                   <input 
                     name="email" 
-                    type={activeTab === 'login' ? 'text' : 'email'} 
-                    placeholder={activeTab === 'login' ? 'e.g. user@example.com or +919822123456' : 'e.g. farmer@example.com'} 
+                    type="text" 
+                    placeholder={activeTab === 'login' ? 'e.g. user@example.com or +919822123456' : 'e.g. farmer@example.com or +919822123456'} 
                     required
                     value={formData.email} 
                     onChange={handleChange}
@@ -212,7 +267,7 @@ export default function AuthScreen({ initialTab = 'login' }) {
                   />
                   <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-[#5B755D]">
                     <span className="material-symbols-outlined text-[18px]">
-                      {activeTab === 'login' ? 'account_circle' : 'mail'}
+                      {activeTab === 'login' ? 'account_circle' : 'contact_mail'}
                     </span>
                   </div>
                 </div>
@@ -240,10 +295,19 @@ export default function AuthScreen({ initialTab = 'login' }) {
               <button 
                 disabled={loading} 
                 type="submit" 
-                className="w-full bg-[#154212] text-white font-label-lg font-bold py-3.5 rounded-lg flex items-center justify-center gap-2 hover:bg-[#0E2C14] transition-all disabled:opacity-60 mt-6 shadow-md"
+                className="w-full bg-[#154212] text-white font-label-lg font-bold py-3.5 rounded-lg flex items-center justify-center gap-2 hover:bg-[#0E2C14] transition-all disabled:opacity-60 mt-6 shadow-md cursor-pointer"
               >
-                {loading ? 'Processing...' : (activeTab === 'login' ? 'Sign In' : 'Create Account')}
-                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                {loading ? (
+                  <>
+                    <span className="animate-spin material-symbols-outlined text-[18px]">progress_activity</span>
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{activeTab === 'login' ? 'Sign In' : 'Create Account'}</span>
+                    <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  </>
+                )}
               </button>
             </form>
 
@@ -264,3 +328,4 @@ export default function AuthScreen({ initialTab = 'login' }) {
     </div>
   );
 }
+

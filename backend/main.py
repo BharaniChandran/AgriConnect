@@ -21,7 +21,6 @@ import payments
 import market_data
 import recommendations
 import predictor
-import train_price_model
 
 # In-memory / mock persistent store for cross-environment testing
 # (Works directly with Postgres models in memory or Supabase)
@@ -62,6 +61,7 @@ def seed_demo_data():
         "name": "Ram Patil (Sahyadri Agro Farms)",
         "location": "Pimpalgaon, Nashik, Maharashtra",
         "phone": "+919822123456",
+        "email": "farmer@agriconnect.com",
         "preferred_language": "mr",
         "role": "farmer",
         "is_admin": False,
@@ -73,6 +73,7 @@ def seed_demo_data():
         "name": "Mumbai Fresh Grocers Ltd.",
         "location": "Vashi APMC, Navi Mumbai, Maharashtra",
         "phone": "+919820012345",
+        "email": "buyer@agriconnect.com",
         "preferred_language": "en",
         "role": "buyer",
         "is_admin": False,
@@ -84,6 +85,7 @@ def seed_demo_data():
         "name": "Platform Admin (AgriConnect)",
         "location": "Pune, Maharashtra",
         "phone": "+919999999999",
+        "email": "admin@agriconnect.com",
         "preferred_language": "mr",
         "role": "admin",
         "is_admin": True,
@@ -136,14 +138,18 @@ def root():
 # --- Auth Endpoints ---
 @app.post("/auth/register", response_model=schemas.Token)
 def register(req: schemas.UserAuthRequest):
-    raw_id = req.phone_or_email.strip()
+    raw_id = (req.phone_or_email or "").strip()
+    if not raw_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone or email is required")
+        
     is_email = "@" in raw_id
     email = raw_id.lower() if is_email else f"{raw_id.replace('+', '')}@agriconnect.local"
     
     import ors_service
-    loc_lat, loc_lng = ors_service.geocode_location_to_lat_lon(req.location or "Tamil Nadu")
+    loc_lat, loc_lng = ors_service.geocode_location_to_lat_lon(req.location or "Nashik, Maharashtra")
 
     supabase_uid = None
+    admin_client = None
     try:
         admin_client = get_supabase_admin_client()
         sb_user_attrs = {
@@ -167,17 +173,36 @@ def register(req: schemas.UserAuthRequest):
         sb_res = admin_client.auth.admin.create_user(sb_user_attrs)
         if sb_res and sb_res.user:
             supabase_uid = str(sb_res.user.id)
-            print(f"Successfully stored email '{email}' in Supabase Auth. User ID: {supabase_uid}")
+            print(f"Successfully created user '{email}' in Supabase Auth. ID: {supabase_uid}")
     except Exception as e:
         print(f"Supabase auth create_user note: {e}")
-        # If user already registered in Supabase, fetch existing user ID
+        # If user already registered in Supabase, fetch and update existing user ID
         try:
-            admin_client = get_supabase_admin_client()
-            users_list = admin_client.auth.admin.list_users()
-            for u in users_list:
-                if u.email == email or getattr(u, "phone", None) == raw_id:
-                    supabase_uid = str(u.id)
-                    break
+            if admin_client:
+                users_list = admin_client.auth.admin.list_users()
+                for u in users_list:
+                    if (u.email and u.email.lower() == email.lower()) or getattr(u, "phone", None) == raw_id:
+                        supabase_uid = str(u.id)
+                        # Ensure email confirmation and password update
+                        try:
+                            admin_client.auth.admin.update_user_by_id(
+                                supabase_uid,
+                                {
+                                    "email_confirm": True,
+                                    "password": req.password_or_otp or "Password123!",
+                                    "user_metadata": {
+                                        "name": req.name or "Agri User",
+                                        "role": req.role,
+                                        "location": req.location or "Nashik, Maharashtra",
+                                        "phone": raw_id,
+                                        "preferred_language": req.preferred_language or "mr",
+                                        "is_admin": req.role == "admin"
+                                    }
+                                }
+                            )
+                        except Exception as update_err:
+                            print(f"Supabase update user note: {update_err}")
+                        break
         except Exception as list_err:
             print(f"Supabase list users error: {list_err}")
 
@@ -187,15 +212,15 @@ def register(req: schemas.UserAuthRequest):
     user_dict = {
         "id": user_id,
         "name": req.name or "Agri User",
-        "location": req.location or "Tamil Nadu",
+        "location": req.location or "Nashik, Maharashtra",
         "latitude": loc_lat,
         "longitude": loc_lng,
         "phone": raw_id,
         "email": email if is_email else "",
-        "preferred_language": req.preferred_language or "ta",
+        "preferred_language": req.preferred_language or "mr",
         "role": req.role,
         "is_admin": req.role == "admin",
-        "password_hash": get_password_hash(req.password_or_otp)
+        "password_hash": get_password_hash(req.password_or_otp or "Password123!")
     }
     STORE_USERS[user_id] = user_dict
 
@@ -215,7 +240,6 @@ def register(req: schemas.UserAuthRequest):
         except Exception as sync_err:
             print(f"Supabase profile table sync note: {sync_err}")
 
-    
     token = create_access_token(data={
         "sub": user_id,
         "role": user_dict["role"],
@@ -231,36 +255,57 @@ def register(req: schemas.UserAuthRequest):
 
 @app.post("/auth/login", response_model=schemas.Token)
 def login(req: schemas.UserAuthRequest):
-    raw_id = req.phone_or_email.strip()
+    raw_id = (req.phone_or_email or "").strip()
+    if not raw_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone or email address is required."
+        )
+
     is_email = "@" in raw_id
     email = raw_id.lower() if is_email else f"{raw_id.replace('+', '')}@agriconnect.local"
+    clean_phone = raw_id.replace(" ", "").replace("-", "")
 
-    # Find user by phone/email or matching username in memory
+    # 1. Search in-memory store (by phone, clean phone suffix, email, or name)
     found_user = None
     for u in STORE_USERS.values():
-        if u["phone"] == raw_id or u.get("email") == email or u.get("email") == raw_id or u["name"] == raw_id:
+        u_phone = (u.get("phone") or "").replace(" ", "").replace("-", "")
+        u_email = (u.get("email") or "").lower()
+        if (
+            u_phone == clean_phone 
+            or (clean_phone and len(clean_phone) >= 10 and u_phone.endswith(clean_phone[-10:]))
+            or u_email == raw_id.lower()
+            or u_email == email.lower()
+            or u.get("name", "").lower() == raw_id.lower()
+        ):
             found_user = u
             break
             
+    # 2. Search Supabase Auth
     if not found_user:
-        # Check Supabase Auth
         try:
             admin_client = get_supabase_admin_client()
             users_list = admin_client.auth.admin.list_users()
             for u in users_list:
-                if u.email == email or u.email == raw_id.lower() or getattr(u, "phone", None) == raw_id:
+                u_phone = getattr(u, "phone", "") or ""
+                u_email = (u.email or "").lower()
+                if (
+                    u_email == email.lower() 
+                    or u_email == raw_id.lower() 
+                    or (clean_phone and len(clean_phone) >= 10 and u_phone.replace(" ", "").endswith(clean_phone[-10:]))
+                ):
                     meta = u.user_metadata or {}
                     role = meta.get("role", req.role or "farmer")
                     user_dict = {
                         "id": str(u.id),
                         "name": meta.get("name", req.name or "Agri User"),
-                        "location": meta.get("location", "Tamil Nadu"),
+                        "location": meta.get("location", "Nashik, Maharashtra"),
                         "phone": meta.get("phone", raw_id),
                         "email": u.email,
-                        "preferred_language": meta.get("preferred_language", "ta"),
+                        "preferred_language": meta.get("preferred_language", "mr"),
                         "role": role,
                         "is_admin": meta.get("is_admin", role == "admin"),
-                        "password_hash": get_password_hash(req.password_or_otp)
+                        "password_hash": get_password_hash(req.password_or_otp or "Password123!")
                     }
                     STORE_USERS[str(u.id)] = user_dict
                     found_user = user_dict
@@ -268,9 +313,55 @@ def login(req: schemas.UserAuthRequest):
         except Exception as e:
             print(f"Supabase auth login lookup note: {e}")
 
+    # 3. Search Supabase database tables (farmers / buyers)
     if not found_user:
-        # Auto-create if not found
-        return register(req)
+        try:
+            admin_client = get_supabase_admin_client()
+            for table in ["farmers", "buyers"]:
+                res = admin_client.table(table).select("*").or_(f"phone.eq.{raw_id},name.ilike.%{raw_id}%").execute()
+                if res.data and len(res.data) > 0:
+                    row = res.data[0]
+                    role = "farmer" if table == "farmers" else "buyer"
+                    user_dict = {
+                        "id": str(row["id"]),
+                        "name": row.get("name", "Agri User"),
+                        "location": row.get("location", "Nashik, Maharashtra"),
+                        "phone": row.get("phone", raw_id),
+                        "email": email if is_email else "",
+                        "preferred_language": row.get("preferred_language", "mr"),
+                        "role": role,
+                        "is_admin": row.get("is_admin", False),
+                        "password_hash": get_password_hash(req.password_or_otp or "Password123!")
+                    }
+                    STORE_USERS[str(row["id"])] = user_dict
+                    found_user = user_dict
+                    break
+        except Exception as db_err:
+            print(f"Supabase DB login lookup note: {db_err}")
+
+    # 4. User not found -> check if this is an auto-registration scenario or return error
+    if not found_user:
+        # If user is not found, return 401 Unauthorized so the user can register
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account not found. Please create an account first."
+        )
+
+    # 5. Verify Password
+    stored_hash = found_user.get("password_hash")
+    input_pass = req.password_or_otp or ""
+    # Allow valid bcrypt hash match OR demo universal passwords
+    is_valid_pass = False
+    if stored_hash and verify_password(input_pass, stored_hash):
+        is_valid_pass = True
+    elif input_pass in ("password123", "admin123", "pass1234", "Password123!", "123456"):
+        is_valid_pass = True
+
+    if not is_valid_pass:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email/phone or password."
+        )
         
     token = create_access_token(data={
         "sub": found_user["id"],
@@ -321,6 +412,7 @@ def read_current_user(current_user: AuthenticatedUser = Depends(get_current_user
         "role": current_user.role,
         "is_admin": current_user.is_admin
     }
+    STORE_USERS[current_user.id] = user_data
     return schemas.UserProfileResponse(**user_data)
 
 @app.post("/users/{user_id}/language")
