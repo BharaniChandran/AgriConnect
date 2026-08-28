@@ -1,0 +1,13 @@
+.git
+.gitignore
+.pytest_cache
+*.exe
+*.log
+backend/venv
+frontend/node_modules
+backend/__pycache__
+__pycache__
+tests
+test_*.py
+backend/test_*.py
+.env
