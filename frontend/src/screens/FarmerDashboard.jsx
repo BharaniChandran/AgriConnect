@@ -333,7 +333,10 @@ export default function FarmerDashboard() {
       console.warn('Realtime broadcast note:', sbBroadcastErr);
     }
 
-    navigate('/lot-confirmation', { state: { lot: createdLot } });
+    setStatusFeedback({
+      type: 'success',
+      message: `🎉 ${createdLot.crop} lot (${createdLot.quantity} kg @ ₹${createdLot.price_per_kg}/kg) is now LIVE on Maharashtra APMC Marketplaces! Awaiting buyer deal confirmation.`
+    });
   };
 
   const handleSelectBuyerOffer = (buyer) => {
@@ -345,7 +348,8 @@ export default function FarmerDashboard() {
           quality: cropInput.quality,
           price_per_kg: buyer.net_price_per_kg || parseFloat(cropInput.price_per_kg),
           location: cropInput.location,
-          target_buyer: buyer
+          target_buyer: buyer,
+          confirmed_by_buyer: true
         }
       }
     });
@@ -355,32 +359,53 @@ export default function FarmerDashboard() {
     <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
       {/* Real-time Buyer Action Notification Banner */}
       {liveBuyerAlert && (
-        <div className="bg-[#154212] text-white p-4 rounded-2xl shadow-lg border border-[#2A6B25] flex items-center justify-between animate-bounce">
+        <div className="bg-[#154212] text-white p-5 rounded-2xl shadow-xl border-2 border-[#2A6B25] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-bounce">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-[#A6E89B]">
-              <span className="material-symbols-outlined text-[24px]">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-[#A6E89B] shrink-0">
+              <span className="material-symbols-outlined text-[28px]">
                 {liveBuyerAlert.type === 'accepted' ? 'check_circle' : 'paid'}
               </span>
             </div>
             <div>
-              <p className="font-label-lg font-bold">
+              <p className="font-label-lg font-bold text-lg">
                 {liveBuyerAlert.type === 'accepted'
                   ? `🎉 Delivery Accepted! Payment of ₹${liveBuyerAlert.payout} cleared for ${liveBuyerAlert.crop}`
-                  : `⚡ Buyer Deal Confirmed: ${liveBuyerAlert.buyerName} has secured Escrow for your ${liveBuyerAlert.crop} (${liveBuyerAlert.quantity} kg @ ₹${liveBuyerAlert.payout})!`}
+                  : `⚡ Buyer Deal Confirmed: ${liveBuyerAlert.buyerName} has confirmed & locked Escrow for ${liveBuyerAlert.crop} (${liveBuyerAlert.quantity} kg @ ₹${liveBuyerAlert.payout})!`}
               </p>
-              <p className="text-xs text-[#A6E89B]">
+              <p className="text-xs text-[#A6E89B] mt-0.5">
                 {liveBuyerAlert.type === 'accepted'
                   ? 'Funds are available in your Escrow & Payments account'
                   : 'Escrow payment locked in MSAMB trust account — proceed with dispatch'}
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setLiveBuyerAlert(null)}
-            className="text-xs bg-white/20 hover:bg-white/30 px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer"
-          >
-            Dismiss
-          </button>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <button
+              onClick={() => navigate('/lot-confirmation', {
+                state: {
+                  lot: {
+                    crop: liveBuyerAlert.crop,
+                    quantity: liveBuyerAlert.quantity || cropInput.quantity,
+                    quality: cropInput.quality,
+                    price_per_kg: liveBuyerAlert.payout ? (liveBuyerAlert.payout / (liveBuyerAlert.quantity || 1)).toFixed(2) : cropInput.price_per_kg,
+                    location: cropInput.location,
+                    buyer_name: liveBuyerAlert.buyerName,
+                    confirmed_by_buyer: true,
+                    status: 'confirmed'
+                  }
+                }
+              })}
+              className="text-xs bg-white text-[#154212] hover:bg-[#EFEBE3] px-4 py-2.5 rounded-xl font-bold transition-all shadow cursor-pointer whitespace-nowrap"
+            >
+              View Confirmed Deal
+            </button>
+            <button
+              onClick={() => setLiveBuyerAlert(null)}
+              className="text-xs bg-white/20 hover:bg-white/30 px-3 py-2.5 rounded-xl font-bold transition-all cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 

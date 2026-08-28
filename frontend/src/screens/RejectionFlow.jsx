@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../apiConfig';
+import { getCropMedia } from '../utils/cropImages';
 
 export default function RejectionFlow() {
   const navigate = useNavigate();
@@ -12,19 +13,19 @@ export default function RejectionFlow() {
   
   const passedTxId = location.state?.txId || 1;
   const passedLot = location.state?.lot || {
-    crop: 'Tomato (Roma)',
+    crop: 'Green Chilli',
     quantity: 1200,
     lot_id: '8472-A'
   };
 
+  const cropMedia = getCropMedia(passedLot.crop);
+
   const [txId] = useState(passedTxId);
   const [reason, setReason] = useState('spoilage');
   const [totalQty] = useState(passedLot.quantity || 1200);
-  const [rejectedQty, setRejectedQty] = useState(Math.min(300, passedLot.quantity || 1200));
-  const [description, setDescription] = useState('Produce arrived squashed and showing signs of early rot.');
-  const [photos, setPhotos] = useState([
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuBfrMSeMMv1SMJAdTGb0ahE_7SSF05Amyx8MzWh0ZQsac22vYOlXWc-OCQGanFSbi9wGeTol1U_fQJhpCRR7tyWYgyrGVHICGyNryN2FOLAlxZNVgo7HaWSgLoa2Vl7fNqOUSxbdfKhoBt5dO3cq8gg4TLOF4UYeftWZSN7VnwvW96uAeiPM1c8LpNPnypJu816IzGAYYI4WZ0CsxqNAH802q5SGR8TkonUX3FNsMLn4hpSPFI7RqBm'
-  ]);
+  const [rejectedQty, setRejectedQty] = useState(Math.min(300, Math.round((passedLot.quantity || 1200) * 0.15)));
+  const [description, setDescription] = useState(`Produce (${passedLot.crop}) arrived showing transit damage/blemishes.`);
+  const [photos, setPhotos] = useState([cropMedia.detail1 || cropMedia.primary]);
   const [loading, setLoading] = useState(false);
 
   const acceptedQty = Math.max(0, totalQty - rejectedQty);
@@ -82,14 +83,14 @@ export default function RejectionFlow() {
       setLoading(false);
       
       if (res.ok) {
-        navigate('/dispute-notification');
+        navigate('/dispute-notification', { state: { lot: passedLot, txId } });
       } else {
         const err = await res.json();
         alert(err.detail || "Failed to submit rejection");
       }
     } catch (e) {
       setLoading(false);
-      navigate('/dispute-notification');
+      navigate('/dispute-notification', { state: { lot: passedLot, txId } });
     }
   };
 
@@ -102,7 +103,9 @@ export default function RejectionFlow() {
             <span className="font-label-lg font-bold">{t('back_to_lots') || 'Back to Review'}</span>
           </div>
           <h2 className="font-display-md text-4xl font-bold text-[#154212]">{t('reject') || 'Report Rejection'}</h2>
-          <p className="font-body-lg text-[#5B755D] mt-2">Document issues with the incoming delivery for Lot #8472-A.</p>
+          <p className="font-body-lg text-[#5B755D] mt-2">
+            Document issues with the incoming delivery for {passedLot.crop} (Lot #{passedLot.lot_id?.slice(-8) || '8472-A'}).
+          </p>
         </div>
       </div>
       

@@ -1,9 +1,32 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
 
 export default function PaymentStatus() {
+  const location = useLocation();
   const { t } = useTranslation('common');
+
+  // Read dynamic lot passed via navigation state or localStorage
+  let passedLot = location.state?.lot;
+  if (!passedLot) {
+    try {
+      const stored = localStorage.getItem('agriconnect_farmer_lots');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.length > 0) passedLot = parsed[0];
+      }
+    } catch {}
+  }
+
+  const lot = passedLot || {
+    lot_id: 'LOT-8923-A',
+    crop: 'Green Chilli',
+    quantity: 1250,
+    price_per_kg: 28.5
+  };
+
+  const totalAmount = parseFloat(lot.quantity || 1000) * parseFloat(lot.price_per_kg || 28.5);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 w-full">
@@ -25,7 +48,7 @@ export default function PaymentStatus() {
               </div>
             </div>
             <div className="mt-8 relative z-10">
-              <span className="font-display-md text-5xl font-bold text-white tracking-tight">{formatCurrency(124500)}</span>
+              <span className="font-display-md text-5xl font-bold text-white tracking-tight">{formatCurrency(totalAmount)}</span>
             </div>
           </section>
           
@@ -40,7 +63,7 @@ export default function PaymentStatus() {
                   <span className="material-symbols-outlined text-[24px]">done</span>
                 </div>
                 <span className="font-label-lg font-bold text-[#154212] text-center text-lg">{t('held') || 'Held'}</span>
-                <span className="font-label-sm font-medium text-[#5B755D] mt-2 text-center bg-[#FCFBF9] px-2 py-1 rounded-md border border-[#E8E2D9]">Oct 24, 10:00 AM</span>
+                <span className="font-label-sm font-medium text-[#5B755D] mt-2 text-center bg-[#FCFBF9] px-2 py-1 rounded-md border border-[#E8E2D9]">Today</span>
               </div>
               
               <div className="relative z-10 flex flex-col items-center flex-1 mb-8 md:mb-0">
@@ -56,14 +79,16 @@ export default function PaymentStatus() {
                   <span className="material-symbols-outlined text-[24px]">check_circle</span>
                 </div>
                 <span className="font-label-lg font-bold text-[#C6C0B5] text-center text-lg">{t('released') || 'Released'}</span>
-                <span className="font-label-sm font-medium text-[#C6C0B5] mt-2 text-center border border-[#E8E2D9] px-2 py-1 rounded-md">Pending</span>
+                <span className="font-label-sm font-medium text-[#C6C0B5] mt-2 text-center border border-[#E8E2D9] px-2 py-1 rounded-md">Pending Acceptance</span>
               </div>
             </div>
             <div className="mt-10 bg-[#FCFBF9] p-6 rounded-xl border border-[#E8E2D9]">
               <div className="flex items-start space-x-4">
                 <span className="material-symbols-outlined text-[#2A6B25] mt-1 text-[24px]">info</span>
                 <div>
-                  <p className="font-body-md text-[#334D35] leading-relaxed">Your payment of {formatCurrency(124500)} is securely held in escrow. Once delivery acceptance is confirmed or any raised dispute is settled, funds will be released directly via Razorpay.</p>
+                  <p className="font-body-md text-[#334D35] leading-relaxed">
+                    Your payment of {formatCurrency(totalAmount)} for {lot.crop} ({lot.quantity} kg) is securely locked in Maharashtra APMC Escrow. Once delivery is accepted, funds are released directly to the farmer bank account.
+                  </p>
                 </div>
               </div>
             </div>
@@ -76,23 +101,23 @@ export default function PaymentStatus() {
             <ul className="space-y-5">
               <li className="flex justify-between items-center border-b border-[#E8E2D9] pb-4">
                 <span className="font-label-sm font-bold text-[#5B755D] uppercase tracking-wider">Lot ID</span>
-                <span className="font-label-lg font-bold text-[#154212]">#LOT-8923-A</span>
+                <span className="font-label-lg font-bold text-[#154212]">#{lot.lot_id?.slice(-8) || 'LOT-8923'}</span>
               </li>
               <li className="flex justify-between items-center border-b border-[#E8E2D9] pb-4">
                 <span className="font-label-sm font-bold text-[#5B755D] uppercase tracking-wider">{t('crop_type') || 'Crop Type'}</span>
-                <span className="font-label-lg font-bold text-[#154212]">Tomato (Roma)</span>
+                <span className="font-label-lg font-bold text-[#154212]">{lot.crop}</span>
               </li>
               <li className="flex justify-between items-center border-b border-[#E8E2D9] pb-4">
                 <span className="font-label-sm font-bold text-[#5B755D] uppercase tracking-wider">{t('quantity') || 'Quantity'}</span>
-                <span className="font-label-lg font-bold text-[#154212]">5,000 kg</span>
+                <span className="font-label-lg font-bold text-[#154212]">{lot.quantity} kg</span>
               </li>
               <li className="flex justify-between items-center border-b border-[#E8E2D9] pb-4">
                 <span className="font-label-sm font-bold text-[#5B755D] uppercase tracking-wider">{t('base_rate') || 'Base Rate'}</span>
-                <span className="font-label-lg font-bold text-[#154212]">{formatCurrency(24.9)} / kg</span>
+                <span className="font-label-lg font-bold text-[#154212]">{formatCurrency(lot.price_per_kg || 28.5)} / kg</span>
               </li>
               <li className="flex justify-between items-center pt-2">
                 <span className="font-display-sm text-xl font-bold text-[#154212]">{t('expected_total') || 'Expected Total'}</span>
-                <span className="font-display-sm text-2xl font-bold text-[#154212]">{formatCurrency(124500)}</span>
+                <span className="font-display-sm text-2xl font-bold text-[#154212]">{formatCurrency(totalAmount)}</span>
               </li>
             </ul>
           </section>
@@ -100,11 +125,11 @@ export default function PaymentStatus() {
           <section className="bg-white border border-[#E8E2D9] rounded-2xl p-8 shadow-sm">
             <h3 className="font-display-sm text-2xl font-bold text-[#154212] mb-6">Actions</h3>
             <div className="flex flex-col space-y-4">
-              <button className="w-full bg-[#154212] text-white font-label-lg font-bold py-4 rounded-xl shadow-md hover:bg-[#0E2C14] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+              <button className="w-full bg-[#154212] text-white font-label-lg font-bold py-4 rounded-xl shadow-md hover:bg-[#0E2C14] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer">
                 <span className="material-symbols-outlined">download</span>
                 {t('download_receipt') || 'Download Receipt'}
               </button>
-              <button className="w-full bg-white border-2 border-[#154212] text-[#154212] font-label-lg font-bold py-4 rounded-xl hover:bg-[#F7F4F0] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+              <button className="w-full bg-white border-2 border-[#154212] text-[#154212] font-label-lg font-bold py-4 rounded-xl hover:bg-[#F7F4F0] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer">
                 <span className="material-symbols-outlined">support_agent</span>
                 {t('contact_support') || 'Contact Support'}
               </button>
