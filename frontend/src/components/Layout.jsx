@@ -67,19 +67,19 @@ export default function Layout({ children }) {
                       : 'text-[#334D35] hover:bg-[#EFEBE3]'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[18px]">dashboard</span>
-                  <span>{t('nav_home') || 'Farmer Dashboard'}</span>
+                  <span className="material-symbols-outlined text-[18px]">agriculture</span>
+                  <span>{t('nav_home') || 'Farmer Hub & Sell'}</span>
                 </Link>
                 <Link 
-                  to="/lot-confirmation" 
+                  to="/orders" 
                   className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                    location.pathname === '/lot-confirmation' 
+                    location.pathname === '/orders' || location.pathname === '/lot-confirmation'
                       ? 'bg-[#154212] text-white shadow-sm' 
                       : 'text-[#334D35] hover:bg-[#EFEBE3]'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[18px]">verified</span>
-                  <span>{t('nav_lot_confirmation') || 'Lot Confirmation'}</span>
+                  <span className="material-symbols-outlined text-[18px]">local_shipping</span>
+                  <span>{t('nav_orders') || 'Active Deals & Dispatch'}</span>
                 </Link>
                 <Link 
                   to="/payment-status" 
@@ -90,7 +90,7 @@ export default function Layout({ children }) {
                   }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-                  <span>{t('nav_payments') || 'Escrow Payments'}</span>
+                  <span>{t('nav_payments') || 'Escrow Payouts & Receipts'}</span>
                 </Link>
               </>
             )}
@@ -109,26 +109,15 @@ export default function Layout({ children }) {
                   <span>{t('nav_lots') || 'Marketplace'}</span>
                 </Link>
                 <Link 
-                  to="/buyer-review" 
+                  to="/orders" 
                   className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                    location.pathname === '/buyer-review' 
+                    location.pathname === '/orders' || location.pathname === '/buyer-review' || location.pathname === '/rejection-flow'
                       ? 'bg-[#154212] text-white shadow-sm' 
                       : 'text-[#334D35] hover:bg-[#EFEBE3]'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[18px]">fact_check</span>
-                  <span>{t('buyer_review_title') || 'Review Delivery'}</span>
-                </Link>
-                <Link 
-                  to="/rejection-flow" 
-                  className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                    location.pathname === '/rejection-flow' 
-                      ? 'bg-[#154212] text-white shadow-sm' 
-                      : 'text-[#334D35] hover:bg-[#EFEBE3]'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[18px]">report_problem</span>
-                  <span>{t('nav_dispute') || 'Dispute Produce'}</span>
+                  <span className="material-symbols-outlined text-[18px]">inventory_2</span>
+                  <span>{t('nav_orders') || 'My Orders & Deliveries'}</span>
                 </Link>
                 <Link 
                   to="/payment-status" 
@@ -138,8 +127,8 @@ export default function Layout({ children }) {
                       : 'text-[#334D35] hover:bg-[#EFEBE3]'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-                  <span>{t('nav_payments') || 'Payment Status'}</span>
+                  <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                  <span>{t('nav_payments') || 'Escrow & Receipts'}</span>
                 </Link>
               </>
             )}
@@ -149,13 +138,24 @@ export default function Layout({ children }) {
                 <Link 
                   to="/admin-resolution" 
                   className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                    location.pathname === '/admin-resolution' 
+                    location.pathname === '/admin-resolution' || location.pathname === '/dispute-notification'
                       ? 'bg-[#154212] text-white shadow-sm' 
                       : 'text-[#334D35] hover:bg-[#EFEBE3]'
                   }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
                   <span>{t('nav_resolution') || 'Resolution Center'}</span>
+                </Link>
+                <Link 
+                  to="/orders" 
+                  className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                    location.pathname === '/orders'
+                      ? 'bg-[#154212] text-white shadow-sm' 
+                      : 'text-[#334D35] hover:bg-[#EFEBE3]'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">list_alt</span>
+                  <span>All Mandi Trades</span>
                 </Link>
                 <Link 
                   to="/payment-status" 
@@ -166,7 +166,7 @@ export default function Layout({ children }) {
                   }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-                  <span>{t('nav_payments') || 'Escrow & Payments'}</span>
+                  <span>Escrow Ledger</span>
                 </Link>
               </>
             )}

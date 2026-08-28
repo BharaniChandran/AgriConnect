@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useOrders } from '../context/OrderContext';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
 import { API_BASE_URL } from '../apiConfig';
@@ -12,6 +13,7 @@ import { calculateDistanceKm, estimateTransitDuration } from '../utils/distance'
 
 export default function BuyerDashboard() {
   const { user, token } = useAuth();
+  const { createPurchaseOrder } = useOrders();
   const { t } = useTranslation('common');
   const [lots, setLots] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -236,36 +238,14 @@ export default function BuyerDashboard() {
 
   const purchaseLot = async (lot) => {
     setPurchasingId(lot.lot_id);
-    const txId = `tx-${Date.now().toString().slice(-6)}`;
-    const payoutTotal = (parseFloat(lot.quantity || 1000) * parseFloat(lot.price_per_kg || 28.5)).toFixed(2);
     
-    const txObj = {
-      id: txId,
-      lot_id: lot.lot_id,
-      crop: lot.crop,
-      quantity: lot.quantity,
-      amount: payoutTotal,
-      price: payoutTotal,
-      status: 'held_in_escrow',
-      payment_status: 'Escrow Locked',
-      buyer_name: user?.name || 'Ravi (Buyer)',
-      farmer_name: lot.farmer_name || 'Farmer',
-      location: lot.location,
-      lot: lot,
-      created_at: new Date().toISOString()
-    };
-
-    // Store in localStorage for continuous workflow
-    try {
-      const stored = localStorage.getItem('agriconnect_buyer_transactions');
-      const parsed = stored ? JSON.parse(stored) : [];
-      localStorage.setItem('agriconnect_buyer_transactions', JSON.stringify([txObj, ...parsed.filter(t => t.id !== txId)]));
-      localStorage.setItem('agriconnect_latest_deal', JSON.stringify({ lot, tx: txObj }));
-    } catch {}
+    // Register in centralized OrderContext
+    const createdOrder = createPurchaseOrder(lot, user);
+    const txId = createdOrder.id;
 
     // 1. Mark lot status as sold in local state
     setLots((prev) => prev.map((l) => (l.lot_id === lot.lot_id ? { ...l, status: 'sold' } : l)));
-    setTransactions((prev) => [txObj, ...prev.filter(t => t.id !== txId)]);
+    setTransactions((prev) => [createdOrder, ...prev.filter(t => t.id !== txId)]);
 
     // 2. Broadcast to farmer dashboard in real-time
     try {
@@ -278,7 +258,7 @@ export default function BuyerDashboard() {
             payload: {
               lot: { ...lot, status: 'sold' },
               buyerName: user?.name || 'Ravi (Buyer)',
-              transaction: txObj
+              transaction: createdOrder
             }
           });
         }
@@ -290,7 +270,7 @@ export default function BuyerDashboard() {
     // 3. Update Firebase Realtime Database
     try {
       dbSet(dbRef(rtdb, `crops_lots/${lot.lot_id}/status`), 'sold').catch(() => {});
-      dbSet(dbRef(rtdb, `transactions/${txId}`), txObj).catch(() => {});
+      dbSet(dbRef(rtdb, `transactions/${txId}`), createdOrder).catch(() => {});
     } catch (e) {}
 
     // 4. Update in Supabase
@@ -310,7 +290,7 @@ export default function BuyerDashboard() {
     } catch (e) {}
 
     setPurchasingId(null);
-    navigate('/buyer-review', { state: { txId, lot } });
+    navigate('/buyer-review', { state: { txId, lot: createdOrder } });
   };
 
   // Compute road distances for each lot relative to Buyer's location

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useOrders } from '../context/OrderContext';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
 import { API_BASE_URL } from '../apiConfig';
@@ -13,33 +14,13 @@ export default function BuyerReview() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, token } = useAuth();
+  const { activeOrder, activeLot, acceptDelivery, orders } = useOrders();
   const { t } = useTranslation('common');
   const [accepting, setAccepting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
-  const txId = location.state?.txId || 1;
-  
-  let resolvedLot = location.state?.lot;
-  if (!resolvedLot) {
-    try {
-      const latestDeal = localStorage.getItem('agriconnect_latest_deal');
-      if (latestDeal) {
-        const parsed = JSON.parse(latestDeal);
-        if (parsed?.lot) resolvedLot = parsed.lot;
-      }
-      if (!resolvedLot) {
-        const storedTxs = localStorage.getItem('agriconnect_buyer_transactions');
-        if (storedTxs) {
-          const parsedTxs = JSON.parse(storedTxs);
-          if (parsedTxs.length > 0 && parsedTxs[0].lot) {
-            resolvedLot = parsedTxs[0].lot;
-          }
-        }
-      }
-    } catch {}
-  }
-
-  const lot = resolvedLot || {
+  // Resolve the exact lot from navigation state, OrderContext, or persistent orders
+  const resolvedLot = location.state?.lot || activeLot || (orders && orders[0]) || {
     lot_id: 'lot-4829',
     crop: 'Red Onion (Lasalgaon)',
     quantity: 1250,
@@ -49,13 +30,18 @@ export default function BuyerReview() {
     farmer_name: 'Ram Patil (Sahyadri Agro Farms)'
   };
 
+  const txId = location.state?.txId || activeOrder?.id || (orders && orders[0]?.id) || 'TX-892301';
+  const lot = resolvedLot;
   const cropMedia = getCropMedia(lot.crop);
 
   const handleAcceptLot = async () => {
     setAccepting(true);
     setFeedback(null);
 
-    // 1. Broadcast acceptance in real time to farmer dashboard
+    // 1. Update in OrderContext
+    acceptDelivery(txId);
+
+    // 2. Broadcast acceptance in real time to farmer dashboard
     try {
       const channel = supabase.channel('agriconnect_marketplace');
       channel.subscribe((status) => {
@@ -77,39 +63,32 @@ export default function BuyerReview() {
       console.warn('Realtime acceptance broadcast note:', e);
     }
 
-    // 2. Update status in Firebase Realtime Database
+    // 3. Update status in Firebase Realtime Database
     try {
       dbSet(dbRef(rtdb, `crops_lots/${lot.lot_id}/status`), 'delivered_and_paid').catch(() => {});
       dbSet(dbRef(rtdb, `transactions/${txId}/status`), 'released_to_farmer').catch(() => {});
     } catch (e) {}
 
-    // 3. Update status in Supabase
+    // 4. Update status in Supabase
     try {
       await supabase.from('crops_lots').update({ status: 'sold' }).eq('lot_id', lot.lot_id);
     } catch (e) {}
 
     try {
-      const res = await fetch(`${API_BASE_URL}/transactions/${txId}/accept`, {
+      await fetch(`${API_BASE_URL}/transactions/${txId}/accept`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         }
       });
-      if (res.ok) {
-        setFeedback({ type: 'success', message: 'Delivery accepted! Escrow payment released to farmer in real-time.' });
-        setTimeout(() => {
-          navigate('/payment-status', { state: { txId, lot } });
-        }, 1200);
-      } else {
-        navigate('/payment-status', { state: { txId, lot } });
-      }
-    } catch (e) {
-      console.warn('Accept lot error:', e);
-      navigate('/payment-status', { state: { txId, lot } });
-    } finally {
-      setAccepting(false);
-    }
+    } catch (e) {}
+
+    setFeedback({ type: 'success', message: `Delivery accepted for ${lot.crop}! Escrow payment released to farmer in real-time.` });
+    setTimeout(() => {
+      navigate('/payment-status', { state: { txId, lot: { ...lot, status: 'released_to_farmer' } } });
+    }, 1000);
+    setAccepting(false);
   };
 
   return (

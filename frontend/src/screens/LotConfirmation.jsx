@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useOrders } from '../context/OrderContext';
 import { formatCurrency } from '../utils/formatters';
 import { getCropMedia } from '../utils/cropImages';
 import { supabase } from '../supabaseClient';
@@ -10,9 +11,10 @@ import { ref as dbRef, onValue } from 'firebase/database';
 export default function LotConfirmation() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { activeLot, orders } = useOrders();
   const { t } = useTranslation('common');
 
-  const initialLot = location.state?.lot || {
+  const initialLot = location.state?.lot || activeLot || (orders && orders[0]) || {
     lot_id: 'lot-4829',
     crop: 'Tomato (Roma)',
     quantity: 1500,

@@ -1,6 +1,7 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { OrderProvider } from './context/OrderContext'
 import Layout from './components/Layout'
 import LanguageSelector from './screens/LanguageSelector'
 import BuyerReview from './screens/BuyerReview'
@@ -13,6 +14,7 @@ import RejectionFlow from './screens/RejectionFlow'
 import AuthScreen from './screens/AuthScreen'
 import FarmerDashboard from './screens/FarmerDashboard'
 import BuyerDashboard from './screens/BuyerDashboard'
+import OrdersList from './screens/OrdersList'
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -45,21 +47,24 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={<LanguageCheck><DashboardRouter /></LanguageCheck>} />
-          <Route path="/login" element={<LanguageCheck><AuthScreen initialTab="login" /></LanguageCheck>} />
-          <Route path="/register" element={<LanguageCheck><AuthScreen initialTab="register" /></LanguageCheck>} />
-          <Route path="/language" element={<LanguageSelector />} />
-          <Route path="/settings" element={<LanguageCheck><ProtectedRoute><Settings /></ProtectedRoute></LanguageCheck>} />
-          
-          <Route path="/buyer-review" element={<LanguageCheck><ProtectedRoute allowedRoles={['buyer']}><BuyerReview /></ProtectedRoute></LanguageCheck>} />
-          <Route path="/lot-confirmation" element={<LanguageCheck><ProtectedRoute allowedRoles={['buyer', 'farmer']}><LotConfirmation /></ProtectedRoute></LanguageCheck>} />
-          <Route path="/rejection-flow" element={<LanguageCheck><ProtectedRoute allowedRoles={['buyer']}><RejectionFlow /></ProtectedRoute></LanguageCheck>} />
-          <Route path="/payment-status" element={<LanguageCheck><ProtectedRoute><PaymentStatus /></ProtectedRoute></LanguageCheck>} />
-          
-          <Route path="/dispute-notification" element={<LanguageCheck><ProtectedRoute allowedRoles={['admin']}><DisputeNotification /></ProtectedRoute></LanguageCheck>} />
-          <Route path="/admin-resolution" element={<LanguageCheck><ProtectedRoute allowedRoles={['admin']}><AdminResolution /></ProtectedRoute></LanguageCheck>} />
-        </Routes>
+        <OrderProvider>
+          <Routes>
+            <Route path="/" element={<LanguageCheck><DashboardRouter /></LanguageCheck>} />
+            <Route path="/login" element={<LanguageCheck><AuthScreen initialTab="login" /></LanguageCheck>} />
+            <Route path="/register" element={<LanguageCheck><AuthScreen initialTab="register" /></LanguageCheck>} />
+            <Route path="/language" element={<LanguageSelector />} />
+            <Route path="/settings" element={<LanguageCheck><ProtectedRoute><Settings /></ProtectedRoute></LanguageCheck>} />
+            
+            <Route path="/orders" element={<LanguageCheck><ProtectedRoute allowedRoles={['buyer', 'farmer']}><OrdersList /></ProtectedRoute></LanguageCheck>} />
+            <Route path="/buyer-review" element={<LanguageCheck><ProtectedRoute allowedRoles={['buyer']}><BuyerReview /></ProtectedRoute></LanguageCheck>} />
+            <Route path="/lot-confirmation" element={<LanguageCheck><ProtectedRoute allowedRoles={['buyer', 'farmer']}><LotConfirmation /></ProtectedRoute></LanguageCheck>} />
+            <Route path="/rejection-flow" element={<LanguageCheck><ProtectedRoute allowedRoles={['buyer']}><RejectionFlow /></ProtectedRoute></LanguageCheck>} />
+            <Route path="/payment-status" element={<LanguageCheck><ProtectedRoute><PaymentStatus /></ProtectedRoute></LanguageCheck>} />
+            
+            <Route path="/dispute-notification" element={<LanguageCheck><ProtectedRoute allowedRoles={['admin', 'buyer', 'farmer']}><DisputeNotification /></ProtectedRoute></LanguageCheck>} />
+            <Route path="/admin-resolution" element={<LanguageCheck><ProtectedRoute allowedRoles={['admin', 'buyer', 'farmer']}><AdminResolution /></ProtectedRoute></LanguageCheck>} />
+          </Routes>
+        </OrderProvider>
       </AuthProvider>
     </Router>
   )

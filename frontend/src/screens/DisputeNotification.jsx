@@ -1,20 +1,24 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useOrders } from '../context/OrderContext';
 import { useTranslation } from 'react-i18next';
 import { getCropMedia } from '../utils/cropImages';
 
 export default function DisputeNotification() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { activeOrder, activeLot, orders } = useOrders();
   const { t } = useTranslation('common');
 
-  const lot = location.state?.lot || {
-    crop: 'Green Chilli',
-    quantity: 1200,
-    lot_id: '8472-A'
+  const lot = location.state?.lot || activeLot || (orders && orders[0]) || {
+    crop: 'Tomato (Roma)',
+    quantity: 1250,
+    lot_id: 'lot-4829'
   };
 
+  const txId = location.state?.txId || activeOrder?.id || 'TX-892301';
   const cropMedia = getCropMedia(lot.crop);
+  const disputeData = activeOrder?.dispute;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 w-full max-w-5xl mx-auto">
