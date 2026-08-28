@@ -470,16 +470,22 @@ def create_crop_lot(lot: schemas.CropLotCreate, current_user: AuthenticatedUser 
         raise HTTPException(status_code=403, detail="Only farmers can list crops/lots")
         
     lot_uuid = str(uuid.uuid4())
+    import ors_service
+    loc_lat, loc_lng = ors_service.geocode_location_to_lat_lon(lot.location or "Nashik, Maharashtra")
+    
     lot_dict = {
         "lot_id": lot_uuid,
         "farmer_id": current_user.id,
+        "farmer_name": current_user.name or "Farmer",
         "crop": lot.crop,
-        "quantity": lot.quantity,
+        "quantity": float(lot.quantity),
         "quality": lot.quality,
         "location": lot.location,
-        "price_per_kg": lot.price_per_kg,
+        "latitude": lot.latitude or loc_lat,
+        "longitude": lot.longitude or loc_lng,
+        "price_per_kg": float(lot.price_per_kg),
         "status": "available",
-        "created_at": datetime.datetime.utcnow()
+        "created_at": datetime.datetime.now(datetime.timezone.utc)
     }
     STORE_LOTS[lot_uuid] = lot_dict
 

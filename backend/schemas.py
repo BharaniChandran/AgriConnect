@@ -34,15 +34,20 @@ class CropLotCreate(BaseModel):
     quality: str = "Grade A"
     location: str = "Pimpalgaon APMC, Nashik"
     price_per_kg: float = Field(..., gt=0)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class CropLotResponse(BaseModel):
     lot_id: str
     farmer_id: str
+    farmer_name: Optional[str] = "Farmer"
     crop: str
     quantity: float
     quality: str
     location: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     price_per_kg: float
     status: str
     created_at: datetime

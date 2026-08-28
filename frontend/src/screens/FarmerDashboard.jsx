@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
 import { API_BASE_URL } from '../apiConfig';
+import { supabase } from '../supabaseClient';
 
 export default function FarmerDashboard() {
   const { user, token } = useAuth();
@@ -205,6 +206,17 @@ export default function FarmerDashboard() {
     saveLocalLots([createdLot, ...currentLocal]);
     setLots(prev => [createdLot, ...prev.filter(l => l.lot_id !== createdLot.lot_id)]);
     setIsPublishing(false);
+
+    // Broadcast in real-time to active buyers across Maharashtra APMCs
+    try {
+      supabase.channel('agriconnect_marketplace').send({
+        type: 'broadcast',
+        event: 'lot_created',
+        payload: createdLot
+      });
+    } catch (sbBroadcastErr) {
+      console.warn('Realtime broadcast note:', sbBroadcastErr);
+    }
 
     navigate('/lot-confirmation', { state: { lot: createdLot } });
   };

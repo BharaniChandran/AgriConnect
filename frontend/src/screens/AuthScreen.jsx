@@ -118,43 +118,6 @@ export default function AuthScreen({ initialTab = 'login' }) {
               </p>
             </div>
 
-            {/* Quick Demo Login Cards */}
-            <div className="mb-6 bg-[#EFEBE3]/70 border border-[#E8E2D9] rounded-xl p-3.5">
-              <div className="text-[11px] font-bold text-[#5B755D] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-[#154212]">bolt</span>
-                <span>Instant Demo Access</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handleQuickLogin('+919822123456', 'password123', 'farmer')}
-                  className="bg-white border border-[#D5DDD4] hover:border-[#154212] hover:bg-[#F2F7F2] p-2 rounded-lg text-center transition-all text-xs font-bold text-[#154212] flex flex-col items-center gap-1 shadow-2xs"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-[#154212]">agriculture</span>
-                  <span>Farmer</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handleQuickLogin('+919820012345', 'password123', 'buyer')}
-                  className="bg-white border border-[#D5DDD4] hover:border-[#154212] hover:bg-[#F2F7F2] p-2 rounded-lg text-center transition-all text-xs font-bold text-[#154212] flex flex-col items-center gap-1 shadow-2xs"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-[#154212]">storefront</span>
-                  <span>Buyer</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handleQuickLogin('+919999999999', 'admin123', 'admin')}
-                  className="bg-white border border-[#D5DDD4] hover:border-[#154212] hover:bg-[#F2F7F2] p-2 rounded-lg text-center transition-all text-xs font-bold text-[#154212] flex flex-col items-center gap-1 shadow-2xs"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-[#154212]">admin_panel_settings</span>
-                  <span>Admin</span>
-                </button>
-              </div>
-            </div>
-
             {/* Tabs */}
             <div className="flex w-full mb-5 border-b border-[#E8E2D9]">
               <button 
