@@ -211,13 +211,26 @@ export default function BuyerDashboard() {
   };
 
   const fetchTransactions = async () => {
+    let localTxs = [];
+    try {
+      const stored = localStorage.getItem('agriconnect_buyer_transactions');
+      if (stored) localTxs = JSON.parse(stored);
+    } catch {}
+
     try {
       const res = await fetch(`${API_BASE_URL}/transactions`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) setTransactions(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        const existingIds = new Set(data.map(d => d.id));
+        setTransactions([...data, ...localTxs.filter(t => !existingIds.has(t.id))]);
+      } else {
+        setTransactions(localTxs);
+      }
     } catch (e) {
       console.warn('Failed to fetch transactions:', e);
+      setTransactions(localTxs);
     }
   };
 
@@ -232,15 +245,27 @@ export default function BuyerDashboard() {
       crop: lot.crop,
       quantity: lot.quantity,
       amount: payoutTotal,
+      price: payoutTotal,
       status: 'held_in_escrow',
+      payment_status: 'Escrow Locked',
       buyer_name: user?.name || 'Ravi (Buyer)',
       farmer_name: lot.farmer_name || 'Farmer',
       location: lot.location,
+      lot: lot,
       created_at: new Date().toISOString()
     };
 
+    // Store in localStorage for continuous workflow
+    try {
+      const stored = localStorage.getItem('agriconnect_buyer_transactions');
+      const parsed = stored ? JSON.parse(stored) : [];
+      localStorage.setItem('agriconnect_buyer_transactions', JSON.stringify([txObj, ...parsed.filter(t => t.id !== txId)]));
+      localStorage.setItem('agriconnect_latest_deal', JSON.stringify({ lot, tx: txObj }));
+    } catch {}
+
     // 1. Mark lot status as sold in local state
     setLots((prev) => prev.map((l) => (l.lot_id === lot.lot_id ? { ...l, status: 'sold' } : l)));
+    setTransactions((prev) => [txObj, ...prev.filter(t => t.id !== txId)]);
 
     // 2. Broadcast to farmer dashboard in real-time
     try {
@@ -509,18 +534,28 @@ export default function BuyerDashboard() {
                 </div>
                 <div>
                   <h3 className="font-label-lg font-bold text-[#154212]">
-                    Order #{tx.id} ({formatCurrency(tx.price)})
+                    {tx.crop || 'Produce'} — {tx.quantity || 1000} kg ({formatCurrency(tx.amount || tx.price || 35000)})
                   </h3>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="w-2 h-2 rounded-full bg-[#154212]"></span>
                     <p className="text-[#5B755D] font-label-sm uppercase tracking-wider text-xs">
-                      Status: <strong>{tx.status}</strong> | Escrow: <strong>{tx.payment_status}</strong>
+                      Status: <strong>{tx.status}</strong> | Escrow: <strong>{tx.payment_status || 'Escrow Locked'}</strong>
                     </p>
                   </div>
                 </div>
               </div>
               <button
-                onClick={() => navigate('/buyer-review')}
+                onClick={() => {
+                  const resolvedLot = tx.lot || {
+                    crop: tx.crop || 'Red Onion (Lasalgaon)',
+                    quantity: tx.quantity || 1000,
+                    quality: 'Grade A',
+                    price_per_kg: tx.amount ? (tx.amount / (tx.quantity || 1000)) : 28.5,
+                    location: tx.location || 'Lasalgaon APMC, Nashik',
+                    lot_id: tx.lot_id || tx.id
+                  };
+                  navigate('/buyer-review', { state: { txId: tx.id, lot: resolvedLot } });
+                }}
                 className="w-full sm:w-auto text-[#154212] border-2 border-[#154212] hover:bg-[#F7F4F0] px-6 py-2.5 rounded-xl font-label-md font-bold transition-colors cursor-pointer"
               >
                 Inspect & Review Delivery

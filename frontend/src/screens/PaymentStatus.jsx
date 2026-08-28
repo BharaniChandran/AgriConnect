@@ -28,6 +28,103 @@ export default function PaymentStatus() {
 
   const totalAmount = parseFloat(lot.quantity || 1000) * parseFloat(lot.price_per_kg || 28.5);
 
+  const handleDownloadReceipt = () => {
+    const receiptHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>AgriConnect_Escrow_Receipt_${lot.lot_id?.slice(-6) || '8923'}</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #154212; background: #fff; }
+          .receipt-box { max-width: 650px; margin: 0 auto; border: 2px solid #154212; padding: 30px; border-radius: 12px; }
+          .header { text-align: center; border-bottom: 2px solid #E8E2D9; padding-bottom: 20px; margin-bottom: 20px; }
+          .logo { font-size: 26px; font-weight: bold; color: #154212; }
+          .sub { color: #5B755D; font-size: 13px; margin-top: 4px; }
+          .badge { display: inline-block; background: #EFEBE3; color: #154212; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-top: 10px; }
+          .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          .table th { text-align: left; background: #FCFBF9; padding: 10px; border-bottom: 1px solid #E8E2D9; font-size: 12px; color: #5B755D; text-transform: uppercase; }
+          .table td { padding: 12px 10px; border-bottom: 1px solid #E8E2D9; font-size: 14px; }
+          .total-row { font-weight: bold; font-size: 18px; color: #154212; background: #EFEBE3; }
+          .footer { text-align: center; font-size: 11px; color: #5B755D; margin-top: 30px; border-top: 1px dashed #C6C0B5; padding-top: 15px; }
+          @media print {
+            body { padding: 0; }
+            .receipt-box { border: 1px solid #000; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt-box">
+          <div class="header">
+            <div class="logo">🌿 AgriConnect</div>
+            <div class="sub">Maharashtra State Agricultural Marketing Board (MSAMB) Partner</div>
+            <div class="badge">OFFICIAL ESCROW RECEIPT & INVOICE</div>
+          </div>
+          <table class="table">
+            <tr>
+              <td><strong>Receipt No:</strong> REC-MH-${Date.now().toString().slice(-8)}</td>
+              <td style="text-align:right;"><strong>Date:</strong> ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+            </tr>
+            <tr>
+              <td><strong>Lot ID:</strong> #${lot.lot_id?.slice(-8) || 'LOT-8923'}</td>
+              <td style="text-align:right;"><strong>Escrow Status:</strong> HELD IN TRUST</td>
+            </tr>
+          </table>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Item / Produce</th>
+                <th>Quantity</th>
+                <th>Rate / kg</th>
+                <th style="text-align:right;">Amount (INR)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>${lot.crop}</strong><br><small style="color:#5B755D;">${lot.quality || 'Grade A'} — Direct Mandi Ingestion</small></td>
+                <td>${lot.quantity} kg</td>
+                <td>₹${lot.price_per_kg || 28.5}/kg</td>
+                <td style="text-align:right; font-weight: bold;">₹${parseFloat(totalAmount).toLocaleString('en-IN')}</td>
+              </tr>
+              <tr class="total-row">
+                <td colspan="3">Total Escrow Locked Payout</td>
+                <td style="text-align:right;">₹${parseFloat(totalAmount).toLocaleString('en-IN')}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="font-size: 12px; color: #334D35; line-height: 1.5;">
+            <strong>Mandi / Hub:</strong> ${lot.location || 'Pimpalgaon Baswant APMC, Nashik, Maharashtra'}<br>
+            <strong>Payment Authority:</strong> MSAMB Escrow Trust (Razorpay Node)<br>
+            <strong>Terms:</strong> Funds will be automatically disbursed to the farmer upon visual inspection & buyer acceptance.
+          </p>
+          <div class="footer">
+            Digitally certified by AgriConnect Escrow Gateway • Compliant with APMC Maharashtra Model Act
+          </div>
+        </div>
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(receiptHtml);
+      printWindow.document.close();
+    } else {
+      // Fallback: trigger file download if popup blocked
+      const blob = new Blob([receiptHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `AgriConnect_Receipt_${lot.crop.replace(/[^a-zA-Z0-9]/g, '_')}_${lot.lot_id?.slice(-6) || '8923'}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 w-full">
       <div className="mb-8">
@@ -125,13 +222,19 @@ export default function PaymentStatus() {
           <section className="bg-white border border-[#E8E2D9] rounded-2xl p-8 shadow-sm">
             <h3 className="font-display-sm text-2xl font-bold text-[#154212] mb-6">Actions</h3>
             <div className="flex flex-col space-y-4">
-              <button className="w-full bg-[#154212] text-white font-label-lg font-bold py-4 rounded-xl shadow-md hover:bg-[#0E2C14] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer">
+              <button 
+                onClick={handleDownloadReceipt}
+                className="w-full bg-[#154212] text-white font-label-lg font-bold py-4 rounded-xl shadow-md hover:bg-[#0E2C14] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
                 <span className="material-symbols-outlined">download</span>
                 {t('download_receipt') || 'Download Receipt'}
               </button>
-              <button className="w-full bg-white border-2 border-[#154212] text-[#154212] font-label-lg font-bold py-4 rounded-xl hover:bg-[#F7F4F0] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer">
+              <button 
+                onClick={() => window.open('tel:+919822010101')}
+                className="w-full bg-white border-2 border-[#154212] text-[#154212] font-label-lg font-bold py-4 rounded-xl hover:bg-[#F7F4F0] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
                 <span className="material-symbols-outlined">support_agent</span>
-                {t('contact_support') || 'Contact Support'}
+                {t('contact_support') || 'Contact APMC Support'}
               </button>
             </div>
           </section>

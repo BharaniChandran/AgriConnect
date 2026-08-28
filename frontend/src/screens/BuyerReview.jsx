@@ -18,13 +18,34 @@ export default function BuyerReview() {
   const [feedback, setFeedback] = useState(null);
 
   const txId = location.state?.txId || 1;
-  const lot = location.state?.lot || {
+  
+  let resolvedLot = location.state?.lot;
+  if (!resolvedLot) {
+    try {
+      const latestDeal = localStorage.getItem('agriconnect_latest_deal');
+      if (latestDeal) {
+        const parsed = JSON.parse(latestDeal);
+        if (parsed?.lot) resolvedLot = parsed.lot;
+      }
+      if (!resolvedLot) {
+        const storedTxs = localStorage.getItem('agriconnect_buyer_transactions');
+        if (storedTxs) {
+          const parsedTxs = JSON.parse(storedTxs);
+          if (parsedTxs.length > 0 && parsedTxs[0].lot) {
+            resolvedLot = parsedTxs[0].lot;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  const lot = resolvedLot || {
     lot_id: 'lot-4829',
-    crop: 'Green Chilli',
+    crop: 'Red Onion (Lasalgaon)',
     quantity: 1250,
     quality: 'Grade A',
     price_per_kg: 28.5,
-    location: 'Pimpalgaon APMC, Nashik',
+    location: 'Lasalgaon APMC, Nashik',
     farmer_name: 'Ram Patil (Sahyadri Agro Farms)'
   };
 
@@ -78,14 +99,14 @@ export default function BuyerReview() {
       if (res.ok) {
         setFeedback({ type: 'success', message: 'Delivery accepted! Escrow payment released to farmer in real-time.' });
         setTimeout(() => {
-          navigate('/payment-status');
+          navigate('/payment-status', { state: { txId, lot } });
         }, 1200);
       } else {
-        navigate('/payment-status');
+        navigate('/payment-status', { state: { txId, lot } });
       }
     } catch (e) {
       console.warn('Accept lot error:', e);
-      navigate('/payment-status');
+      navigate('/payment-status', { state: { txId, lot } });
     } finally {
       setAccepting(false);
     }
