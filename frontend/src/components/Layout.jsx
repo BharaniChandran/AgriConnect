@@ -79,7 +79,7 @@ export default function Layout({ children }) {
                   }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">verified</span>
-                  <span>Lot Confirmation</span>
+                  <span>{t('nav_lot_confirmation') || 'Lot Confirmation'}</span>
                 </Link>
                 <Link 
                   to="/payment-status" 
@@ -128,7 +128,7 @@ export default function Layout({ children }) {
                   }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">report_problem</span>
-                  <span>Dispute Produce</span>
+                  <span>{t('nav_dispute') || 'Dispute Produce'}</span>
                 </Link>
                 <Link 
                   to="/payment-status" 
@@ -155,7 +155,7 @@ export default function Layout({ children }) {
                   }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
-                  <span>Resolution Center</span>
+                  <span>{t('nav_resolution') || 'Resolution Center'}</span>
                 </Link>
                 <Link 
                   to="/payment-status" 
@@ -166,7 +166,7 @@ export default function Layout({ children }) {
                   }`}
                 >
                   <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-                  <span>Escrow & Payments</span>
+                  <span>{t('nav_payments') || 'Escrow & Payments'}</span>
                 </Link>
               </>
             )}

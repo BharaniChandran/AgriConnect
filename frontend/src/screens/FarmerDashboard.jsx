@@ -264,9 +264,9 @@ export default function FarmerDashboard() {
             <span className="w-2 h-2 rounded-full bg-green-600 animate-pulse"></span>
             OpenRouteService Driving Distance & Net Price Optimizer
           </span>
-          <h1 className="font-display-md text-4xl font-bold text-[#154212]">Farmer Hub & Advisory</h1>
+          <h1 className="font-display-md text-4xl font-bold text-[#154212]">{t('farmer_hub_title') || 'Farmer Hub & Advisory'}</h1>
           <p className="font-body-md text-[#5B755D] mt-1">
-            Ranks buyers by who nets you the most money after transport cost — with real OpenRouteService driving distances and 3-day ML price forecasting.
+            {t('farmer_hub_desc') || 'Ranks buyers by who nets you the most money after transport cost — with real OpenRouteService driving distances and 3-day ML price forecasting.'}
           </p>
         </div>
       </div>
@@ -288,20 +288,20 @@ export default function FarmerDashboard() {
               <span className="material-symbols-outlined text-[24px]">explore</span>
             </div>
             <div>
-              <h2 className="font-display-sm text-2xl font-bold text-[#154212]">Buyer Match & Net Profit Analyzer</h2>
-              <p className="text-sm text-[#5B755D]">Finds verified buyers within driving radius and ranks by highest net payout.</p>
+              <h2 className="font-display-sm text-2xl font-bold text-[#154212]">{t('buyer_match_analyzer') || 'Buyer Match & Net Profit Analyzer'}</h2>
+              <p className="text-sm text-[#5B755D]">{t('buyer_match_desc') || 'Finds verified buyers within driving radius and ranks by highest net payout.'}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={handleAnalyzeClick}
             disabled={isAnalyzing}
-            className="hidden sm:inline-flex items-center gap-2 bg-[#F7F4F0] text-[#154212] hover:bg-[#EFEBE3] border border-[#154212] px-4 py-2.5 rounded-xl font-label-md font-bold transition-all text-sm"
+            className="hidden sm:inline-flex items-center gap-2 bg-[#F7F4F0] text-[#154212] hover:bg-[#EFEBE3] border border-[#154212] px-4 py-2.5 rounded-xl font-label-md font-bold transition-all text-sm cursor-pointer"
           >
             <span className={`material-symbols-outlined text-[18px] ${isAnalyzing ? 'animate-spin' : ''}`}>
               {isAnalyzing ? 'sync' : 'auto_graph'}
             </span>
-            {isAnalyzing ? 'Optimizing...' : 'Re-calculate Distances'}
+            {isAnalyzing ? 'Optimizing...' : (t('recalculate_distances') || 'Re-calculate Distances')}
           </button>
         </div>
 
@@ -309,7 +309,7 @@ export default function FarmerDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label className="block font-label-sm font-bold uppercase tracking-wider mb-2 text-[#5B755D]">
-                Crop Commodity
+                {t('crop_commodity') || 'Crop Commodity'}
               </label>
               <select
                 value={cropInput.crop}
@@ -335,7 +335,7 @@ export default function FarmerDashboard() {
 
             <div>
               <label className="block font-label-sm font-bold uppercase tracking-wider mb-2 text-[#5B755D]">
-                Total Quantity (kg)
+                {t('total_quantity_kg') || 'Total Quantity (kg)'}
               </label>
               <input
                 type="number"
@@ -355,7 +355,7 @@ export default function FarmerDashboard() {
 
             <div>
               <label className="block font-label-sm font-bold uppercase tracking-wider mb-2 text-[#5B755D]">
-                Quality Grade
+                {t('quality_grade') || 'Quality Grade'}
               </label>
               <select
                 value={cropInput.quality}
@@ -374,7 +374,7 @@ export default function FarmerDashboard() {
 
             <div>
               <label className="block font-label-sm font-bold uppercase tracking-wider mb-2 text-[#5B755D]">
-                Farmer Location / Hub
+                {t('farmer_location_hub') || 'Farmer Location / Hub'}
               </label>
               <select
                 value={cropInput.location}
@@ -385,19 +385,21 @@ export default function FarmerDashboard() {
                 }}
                 className="w-full p-3.5 border border-[#E8E2D9] rounded-xl bg-[#FCFBF9] focus:bg-white focus:border-[#154212] outline-none font-medium text-[#154212]"
               >
+                <option value="Nashik APMC Mandi, Maharashtra">Nashik APMC, Maharashtra</option>
+                <option value="Pune APMC Market Yard, Maharashtra">Pune APMC, Maharashtra</option>
+                <option value="Vashi APMC Navi Mumbai, Maharashtra">Vashi APMC Navi Mumbai</option>
+                <option value="Nagpur Kalamna APMC, Maharashtra">Nagpur Kalamna APMC</option>
+                <option value="Kolhapur Shahu APMC, Maharashtra">Kolhapur APMC</option>
+                <option value="Ahmednagar APMC, Maharashtra">Ahmednagar APMC</option>
+                <option value="Lasalgaon Onion Mandi, Nashik">Lasalgaon Mandi, Nashik</option>
                 <option value="Oddanchatram Mandi, Dindigul">Oddanchatram, Dindigul</option>
-                <option value="MGR Market, Madurai">MGR Market, Madurai</option>
-                <option value="Uzhavar Sandhai, Coimbatore">Uzhavar Sandhai, Coimbatore</option>
-                <option value="Gandhi Market, Trichy">Gandhi Market, Trichy</option>
-                <option value="Perundurai, Erode">Perundurai, Erode</option>
-                <option value="Salem Regulated Market, Salem">Salem Market, Salem</option>
                 <option value="Koyambedu Wholesale Market, Chennai">Koyambedu, Chennai</option>
               </select>
             </div>
 
             <div>
               <label className="block font-label-sm font-bold uppercase tracking-wider mb-2 text-[#5B755D]">
-                Max Driving Radius
+                {t('max_driving_radius') || 'Max Driving Radius'}
               </label>
               <select
                 value={cropInput.radius_km}
@@ -413,7 +415,7 @@ export default function FarmerDashboard() {
                 <option value="100">100 km (Regional Mandis)</option>
                 <option value="150">150 km (Adjacent Districts)</option>
                 <option value="250">250 km (Wide Radius)</option>
-                <option value="500">500 km (All Tamil Nadu)</option>
+                <option value="500">500 km (All Mandis)</option>
               </select>
             </div>
           </div>
@@ -691,7 +693,7 @@ export default function FarmerDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end pt-2">
             <div className="lg:col-span-3">
               <label className="block font-label-sm font-bold uppercase tracking-wider mb-2 text-[#5B755D]">
-                Asking Price per kg (₹) <span className="text-xs normal-case text-gray-500">(Auto-optimized for highest net return)</span>
+                {t('asking_price_per_kg') || 'Asking Price per kg (₹)'} <span className="text-xs normal-case text-gray-500">({t('auto_optimized') || 'Auto-optimized for highest net return'})</span>
               </label>
               <input
                 type="number"
@@ -708,7 +710,7 @@ export default function FarmerDashboard() {
               <button
                 type="submit"
                 disabled={isPublishing}
-                className="w-full bg-[#154212] text-white py-4 rounded-xl font-label-lg font-bold hover:bg-[#0E2C14] transition-all flex items-center justify-center gap-2 shadow-md active:scale-[0.98] disabled:opacity-75"
+                className="w-full bg-[#154212] text-white py-4 rounded-xl font-label-lg font-bold hover:bg-[#0E2C14] transition-all flex items-center justify-center gap-2 shadow-md active:scale-[0.98] disabled:opacity-75 cursor-pointer"
               >
                 {isPublishing ? (
                   <>
@@ -718,7 +720,7 @@ export default function FarmerDashboard() {
                 ) : (
                   <>
                     <span className="material-symbols-outlined text-[20px]">publish</span>
-                    Publish Produce Lot
+                    {t('publish_produce_lot') || 'Publish Produce Lot'}
                   </>
                 )}
               </button>
@@ -731,13 +733,13 @@ export default function FarmerDashboard() {
       <section>
         <div className="flex justify-between items-center mb-6">
           <h2 className="font-display-sm text-2xl font-bold text-[#154212] flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#5B755D]">inventory_2</span> My Active Lots ({lots.length})
+            <span className="material-symbols-outlined text-[#5B755D]">inventory_2</span> {t('my_active_lots') || 'My Active Lots'} ({lots.length})
           </h2>
           <button
             onClick={fetchLots}
-            className="text-sm font-medium text-[#154212] hover:text-[#0E2C14] flex items-center gap-1 bg-[#EFEBE3] px-3 py-1.5 rounded-lg transition-colors"
+            className="text-sm font-medium text-[#154212] hover:text-[#0E2C14] flex items-center gap-1 bg-[#EFEBE3] px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px]">refresh</span> Refresh
+            <span className="material-symbols-outlined text-[16px]">refresh</span> {t('refresh') || 'Refresh'}
           </button>
         </div>
 
