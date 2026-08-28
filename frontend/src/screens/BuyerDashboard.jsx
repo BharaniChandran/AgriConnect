@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
 import { API_BASE_URL } from '../apiConfig';
 import { supabase } from '../supabaseClient';
+import { db as firestoreDb } from '../firebaseClient';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { calculateDistanceKm, estimateTransitDuration } from '../utils/distance';
 
 export default function BuyerDashboard() {
@@ -24,7 +26,33 @@ export default function BuyerDashboard() {
     fetchLots();
     fetchTransactions();
 
-    // 1. Subscribe to Supabase Broadcast & DB Realtime Channel
+    // 1. Subscribe to Firebase Cloud Firestore Live Snapshot
+    let unsubscribeFirestore = () => {};
+    try {
+      unsubscribeFirestore = onSnapshot(collection(firestoreDb, 'crops_lots'), (snapshot) => {
+        const firestoreLots = [];
+        snapshot.forEach((doc) => {
+          firestoreLots.push({ lot_id: doc.id, ...doc.data() });
+        });
+        if (firestoreLots.length > 0) {
+          setLots((prev) => {
+            const map = new Map();
+            // Firestore lots take priority
+            firestoreLots.forEach((l) => map.set(l.lot_id, l));
+            prev.forEach((l) => {
+              if (!map.has(l.lot_id)) map.set(l.lot_id, l);
+            });
+            return Array.from(map.values()).filter((l) => l.status === 'available');
+          });
+        }
+      }, (err) => {
+        console.warn('Firestore snapshot note:', err);
+      });
+    } catch (fsErr) {
+      console.warn('Firestore onSnapshot init note:', fsErr);
+    }
+
+    // 2. Subscribe to Supabase Broadcast & DB Realtime Channel
     const channel = supabase
       .channel('agriconnect_marketplace')
       .on('broadcast', { event: 'lot_created' }, (eventPayload) => {
@@ -58,6 +86,7 @@ export default function BuyerDashboard() {
     }, 10000);
 
     return () => {
+      unsubscribeFirestore();
       supabase.removeChannel(channel);
       clearInterval(interval);
     };

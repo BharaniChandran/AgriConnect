@@ -430,8 +430,38 @@ def is_valid_uuid(val: Any) -> bool:
     except ValueError:
         return False
 
+def get_firestore_client():
+    try:
+        import firebase_admin
+        from firebase_admin import firestore
+        if not firebase_admin._apps:
+            project_id = os.getenv("FIREBASE_PROJECT_ID", "agriconnect-pilot")
+            firebase_admin.initialize_app(options={"projectId": project_id})
+        return firestore.client()
+    except Exception as e:
+        return None
+
+def sync_user_to_firestore_profile(user_id: str, role: str, name: str = "", location: str = "", phone: str = "", preferred_language: str = "mr"):
+    """Sync user profile to Google Cloud Firestore 'users' collection."""
+    try:
+        db_fs = get_firestore_client()
+        if db_fs:
+            db_fs.collection("users").document(str(user_id)).set({
+                "id": str(user_id),
+                "name": name or "Agri User",
+                "location": location or "Nashik, Maharashtra",
+                "phone": phone or "",
+                "preferred_language": preferred_language or "mr",
+                "role": role or "farmer",
+                "is_admin": role == "admin",
+                "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+            }, merge=True)
+    except Exception as e:
+        pass
+
 def sync_user_to_supabase_profile(user_id: str, role: str, name: str = "", location: str = "", phone: str = "", preferred_language: str = "mr"):
     """Ensure user profile is present in Supabase farmers or buyers table."""
+    sync_user_to_firestore_profile(user_id, role, name, location, phone, preferred_language)
     if not is_valid_uuid(user_id):
         return
     try:
@@ -488,6 +518,28 @@ def create_crop_lot(lot: schemas.CropLotCreate, current_user: AuthenticatedUser 
         "created_at": datetime.datetime.now(datetime.timezone.utc)
     }
     STORE_LOTS[lot_uuid] = lot_dict
+
+    # Sync to Firebase Cloud Firestore
+    try:
+        db_fs = get_firestore_client()
+        if db_fs:
+            db_fs.collection("crops_lots").document(lot_uuid).set({
+                "lot_id": lot_uuid,
+                "farmer_id": current_user.id,
+                "farmer_name": current_user.name or "Farmer",
+                "crop": lot.crop,
+                "quantity": float(lot.quantity),
+                "quality": lot.quality,
+                "location": lot.location,
+                "latitude": lot_dict["latitude"],
+                "longitude": lot_dict["longitude"],
+                "price_per_kg": float(lot.price_per_kg),
+                "status": "available",
+                "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+            })
+            print(f"Synced lot {lot_uuid} to Firestore crops_lots")
+    except Exception as e:
+        pass
 
     # Sync to Supabase crops_lots table
     try:

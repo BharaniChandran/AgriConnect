@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
 import { API_BASE_URL } from '../apiConfig';
 import { supabase } from '../supabaseClient';
+import { db as firestoreDb } from '../firebaseClient';
+import { doc, setDoc } from 'firebase/firestore';
 
 export default function FarmerDashboard() {
   const { user, token } = useAuth();
@@ -206,6 +208,16 @@ export default function FarmerDashboard() {
     saveLocalLots([createdLot, ...currentLocal]);
     setLots(prev => [createdLot, ...prev.filter(l => l.lot_id !== createdLot.lot_id)]);
     setIsPublishing(false);
+
+    // Sync to Firebase Cloud Firestore for real-time live distribution
+    try {
+      setDoc(doc(firestoreDb, 'crops_lots', createdLot.lot_id), {
+        ...createdLot,
+        created_at: createdLot.created_at || new Date().toISOString()
+      }).catch((e) => console.warn('Firestore lot write note:', e));
+    } catch (fsErr) {
+      console.warn('Firestore setDoc note:', fsErr);
+    }
 
     // Broadcast in real-time to active buyers across Maharashtra APMCs
     try {
