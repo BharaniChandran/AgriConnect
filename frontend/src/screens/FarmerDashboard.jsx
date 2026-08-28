@@ -335,7 +335,17 @@ export default function FarmerDashboard() {
 
     setStatusFeedback({
       type: 'success',
-      message: `🎉 ${createdLot.crop} lot (${createdLot.quantity} kg @ ₹${createdLot.price_per_kg}/kg) is now LIVE on Maharashtra APMC Marketplaces! Awaiting buyer deal confirmation.`
+      message: `🎉 ${createdLot.crop} lot (${createdLot.quantity} kg @ ₹${createdLot.price_per_kg}/kg) is now LIVE on Maharashtra APMC Marketplaces!`
+    });
+
+    navigate('/lot-confirmation', {
+      state: {
+        lot: {
+          ...createdLot,
+          status: 'awaiting_confirmation',
+          confirmed_by_buyer: false
+        }
+      }
     });
   };
 
