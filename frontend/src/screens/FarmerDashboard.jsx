@@ -210,7 +210,26 @@ export default function FarmerDashboard() {
     setLots(prev => [createdLot, ...prev.filter(l => l.lot_id !== createdLot.lot_id)]);
     setIsPublishing(false);
 
-    // Sync to Firebase Cloud Firestore and Realtime Database for live distribution
+    // 1. Sync to Supabase crops_lots table directly
+    try {
+      supabase.from('crops_lots').upsert({
+        lot_id: createdLot.lot_id,
+        farmer_id: createdLot.farmer_id || user?.id || 'farmer-1',
+        crop: createdLot.crop,
+        quantity: parseFloat(createdLot.quantity),
+        quality: createdLot.quality || 'Grade A',
+        location: createdLot.location || 'Nashik, Maharashtra',
+        price_per_kg: parseFloat(createdLot.price_per_kg),
+        status: 'available',
+        created_at: createdLot.created_at || new Date().toISOString()
+      }).then(({ error }) => {
+        if (error) console.warn('Supabase lot upsert note:', error);
+      });
+    } catch (sbUpsertErr) {
+      console.warn('Supabase upsert note:', sbUpsertErr);
+    }
+
+    // 2. Sync to Firebase Cloud Firestore and Realtime Database for live distribution
     try {
       setDoc(doc(firestoreDb, 'crops_lots', createdLot.lot_id), {
         ...createdLot,
@@ -221,17 +240,24 @@ export default function FarmerDashboard() {
     }
 
     try {
-      dbSet(dbRef(rtdb, `crops_lots/${createdLot.lot_id}`), createdLot).catch(() => {});
+      dbSet(dbRef(rtdb, `crops_lots/${createdLot.lot_id}`), createdLot).catch((e) => {
+        console.warn('RTDB write note:', e);
+      });
     } catch (rtdbErr) {
       console.warn('RTDB write note:', rtdbErr);
     }
 
-    // Broadcast in real-time to active buyers across Maharashtra APMCs
+    // 3. Broadcast in real-time to active buyers across Maharashtra APMCs
     try {
-      supabase.channel('agriconnect_marketplace').send({
-        type: 'broadcast',
-        event: 'lot_created',
-        payload: createdLot
+      const channel = supabase.channel('agriconnect_marketplace');
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'lot_created',
+            payload: createdLot
+          });
+        }
       });
     } catch (sbBroadcastErr) {
       console.warn('Realtime broadcast note:', sbBroadcastErr);

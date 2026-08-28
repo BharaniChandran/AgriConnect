@@ -129,23 +129,40 @@ export default function BuyerDashboard() {
       console.warn(e);
     }
 
+    const collectedLots = new Map();
+    localLots.forEach((l) => { if (l && l.lot_id) collectedLots.set(l.lot_id, l); });
+
+    // 1. Fetch from Supabase crops_lots table (cross-device/cross-browser)
+    try {
+      const { data: sbLots, error: sbErr } = await supabase
+        .from('crops_lots')
+        .select('*')
+        .eq('status', 'available')
+        .order('created_at', { ascending: false });
+
+      if (sbLots && sbLots.length > 0) {
+        sbLots.forEach((l) => collectedLots.set(l.lot_id, l));
+      }
+    } catch (sbEx) {
+      console.warn('Supabase lots fetch note:', sbEx);
+    }
+
+    // 2. Fetch from backend API
     try {
       const res = await fetch(`${API_BASE_URL}/lots`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        const backendIds = new Set(data.map((l) => l.lot_id));
-        const merged = [...data, ...localLots.filter((l) => !backendIds.has(l.lot_id))];
-        setLots(merged);
-        return;
+        data.forEach((l) => { if (l && l.lot_id) collectedLots.set(l.lot_id, l); });
       }
     } catch (e) {
       console.warn('Backend lots fetch note:', e);
     }
 
-    if (localLots.length > 0) {
-      setLots(localLots);
+    if (collectedLots.size > 0) {
+      const allAvailable = Array.from(collectedLots.values()).filter((l) => l.status === 'available');
+      setLots(allAvailable);
     } else {
       setLots([
         {
