@@ -84,12 +84,23 @@ export default function BuyerDashboard() {
       .channel('agriconnect_marketplace')
       .on('broadcast', { event: 'lot_created' }, (eventPayload) => {
         const newLot = eventPayload.payload;
-        if (newLot) {
+        if (newLot && newLot.lot_id) {
+          // Cache live lot so re-fetch never wipes it out
+          try {
+            const cached = JSON.parse(localStorage.getItem('agriconnect_live_lots') || '[]');
+            const updated = [newLot, ...cached.filter((l) => l.lot_id !== newLot.lot_id)];
+            localStorage.setItem('agriconnect_live_lots', JSON.stringify(updated));
+          } catch (e) {}
+
           setLots((prev) => {
-            const exists = prev.some((l) => l.lot_id === newLot.lot_id);
-            if (exists) return prev;
-            return [newLot, ...prev];
+            const map = new Map();
+            map.set(newLot.lot_id, newLot);
+            prev.forEach((l) => {
+              if (l && l.lot_id && !map.has(l.lot_id)) map.set(l.lot_id, l);
+            });
+            return Array.from(map.values()).filter((l) => l.status === 'available');
           });
+
           setLiveAlert({
             crop: newLot.crop,
             quantity: newLot.quantity,
@@ -102,15 +113,15 @@ export default function BuyerDashboard() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'crops_lots' },
         () => {
-          fetchLots();
+          fetchLots(false);
         }
       )
       .subscribe();
 
-    // Periodic polling fallback every 10 seconds for multi-device reliability
+    // Periodic polling fallback every 15 seconds for multi-device reliability
     const interval = setInterval(() => {
       fetchLots(false);
-    }, 10000);
+    }, 15000);
 
     return () => {
       unsubscribeFirestore();
@@ -125,6 +136,11 @@ export default function BuyerDashboard() {
     try {
       const stored = localStorage.getItem('agriconnect_farmer_lots');
       if (stored) localLots = JSON.parse(stored);
+      const liveStored = localStorage.getItem('agriconnect_live_lots');
+      if (liveStored) {
+        const parsedLive = JSON.parse(liveStored);
+        localLots = [...parsedLive, ...localLots.filter((l) => !parsedLive.some((p) => p.lot_id === l.lot_id))];
+      }
     } catch (e) {
       console.warn(e);
     }
@@ -134,14 +150,14 @@ export default function BuyerDashboard() {
 
     // 1. Fetch from Supabase crops_lots table (cross-device/cross-browser)
     try {
-      const { data: sbLots, error: sbErr } = await supabase
+      const { data: sbLots } = await supabase
         .from('crops_lots')
         .select('*')
         .eq('status', 'available')
         .order('created_at', { ascending: false });
 
       if (sbLots && sbLots.length > 0) {
-        sbLots.forEach((l) => collectedLots.set(l.lot_id, l));
+        sbLots.forEach((l) => { if (l && l.lot_id) collectedLots.set(l.lot_id, l); });
       }
     } catch (sbEx) {
       console.warn('Supabase lots fetch note:', sbEx);
@@ -160,31 +176,38 @@ export default function BuyerDashboard() {
       console.warn('Backend lots fetch note:', e);
     }
 
-    if (collectedLots.size > 0) {
-      const allAvailable = Array.from(collectedLots.values()).filter((l) => l.status === 'available');
-      setLots(allAvailable);
-    } else {
-      setLots([
-        {
-          lot_id: 'lot-4829',
-          crop: 'Tomato (Roma)',
-          quantity: 1250,
-          quality: 'Grade A',
-          price_per_kg: 28.5,
-          location: 'Pimpalgaon APMC, Nashik',
-          status: 'available'
-        },
-        {
-          lot_id: 'lot-4830',
-          crop: 'Red Onion (Lasalgaon)',
-          quantity: 3000,
-          quality: 'Grade A',
-          price_per_kg: 31.0,
-          location: 'Lasalgaon APMC, Nashik',
-          status: 'available'
-        }
-      ]);
-    }
+    setLots((prev) => {
+      const mergedMap = new Map();
+      // Keep existing lots in state
+      prev.forEach((l) => { if (l && l.lot_id) mergedMap.set(l.lot_id, l); });
+      // Overlay collected lots from server/cache
+      collectedLots.forEach((l, id) => mergedMap.set(id, l));
+
+      if (mergedMap.size === 0) {
+        return [
+          {
+            lot_id: 'lot-4829',
+            crop: 'Tomato (Roma)',
+            quantity: 1250,
+            quality: 'Grade A',
+            price_per_kg: 28.5,
+            location: 'Pimpalgaon APMC, Nashik',
+            status: 'available'
+          },
+          {
+            lot_id: 'lot-4830',
+            crop: 'Red Onion (Lasalgaon)',
+            quantity: 3000,
+            quality: 'Grade A',
+            price_per_kg: 31.0,
+            location: 'Lasalgaon APMC, Nashik',
+            status: 'available'
+          }
+        ];
+      }
+
+      return Array.from(mergedMap.values()).filter((l) => l.status === 'available');
+    });
   };
 
   const fetchTransactions = async () => {
