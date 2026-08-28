@@ -223,8 +223,58 @@ export default function BuyerDashboard() {
 
   const purchaseLot = async (lot) => {
     setPurchasingId(lot.lot_id);
+    const txId = `tx-${Date.now().toString().slice(-6)}`;
+    const payoutTotal = (parseFloat(lot.quantity || 1000) * parseFloat(lot.price_per_kg || 28.5)).toFixed(2);
+    
+    const txObj = {
+      id: txId,
+      lot_id: lot.lot_id,
+      crop: lot.crop,
+      quantity: lot.quantity,
+      amount: payoutTotal,
+      status: 'held_in_escrow',
+      buyer_name: user?.name || 'Ravi (Buyer)',
+      farmer_name: lot.farmer_name || 'Farmer',
+      location: lot.location,
+      created_at: new Date().toISOString()
+    };
+
+    // 1. Mark lot status as sold in local state
+    setLots((prev) => prev.map((l) => (l.lot_id === lot.lot_id ? { ...l, status: 'sold' } : l)));
+
+    // 2. Broadcast to farmer dashboard in real-time
     try {
-      const res = await fetch(`${API_BASE_URL}/transactions`, {
+      const channel = supabase.channel('agriconnect_marketplace');
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'lot_purchased',
+            payload: {
+              lot: { ...lot, status: 'sold' },
+              buyerName: user?.name || 'Ravi (Buyer)',
+              transaction: txObj
+            }
+          });
+        }
+      });
+    } catch (e) {
+      console.warn('Realtime purchase broadcast note:', e);
+    }
+
+    // 3. Update Firebase Realtime Database
+    try {
+      dbSet(dbRef(rtdb, `crops_lots/${lot.lot_id}/status`), 'sold').catch(() => {});
+      dbSet(dbRef(rtdb, `transactions/${txId}`), txObj).catch(() => {});
+    } catch (e) {}
+
+    // 4. Update in Supabase
+    try {
+      await supabase.from('crops_lots').update({ status: 'sold' }).eq('lot_id', lot.lot_id);
+    } catch (e) {}
+
+    try {
+      await fetch(`${API_BASE_URL}/transactions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -232,20 +282,10 @@ export default function BuyerDashboard() {
         },
         body: JSON.stringify({ lot_id: lot.lot_id })
       });
+    } catch (e) {}
 
-      if (res.ok) {
-        await fetchLots();
-        await fetchTransactions();
-        navigate('/buyer-review');
-      } else {
-        navigate('/buyer-review');
-      }
-    } catch (e) {
-      console.error('Purchase lot error:', e);
-      navigate('/buyer-review');
-    } finally {
-      setPurchasingId(null);
-    }
+    setPurchasingId(null);
+    navigate('/buyer-review', { state: { txId, lot } });
   };
 
   // Compute road distances for each lot relative to Buyer's location

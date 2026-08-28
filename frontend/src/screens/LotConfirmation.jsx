@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
+import { getCropMedia } from '../utils/cropImages';
 
 export default function LotConfirmation() {
   const navigate = useNavigate();
@@ -15,15 +16,19 @@ export default function LotConfirmation() {
     location: 'Pimpalgaon APMC, Nashik, Maharashtra'
   };
 
+  const cropMedia = getCropMedia(lot.crop);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-5xl mx-auto w-full">
       <div className="mb-12 text-center md:text-left flex flex-col md:flex-row items-center md:items-start gap-6 bg-white p-8 rounded-2xl border border-[#E8E2D9] shadow-sm">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#EFEBE3] text-[#154212] shrink-0">
-          <span className="material-symbols-outlined text-[40px]">check_circle</span>
+        <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-[#154212] shrink-0 shadow-sm">
+          <img src={cropMedia.primary} alt={lot.crop} className="w-full h-full object-cover" />
         </div>
         <div>
-          <h1 className="font-display-md text-4xl font-bold text-[#154212] mb-3">Lot Successfully Confirmed</h1>
-          <p className="font-body-lg text-[#5B755D] max-w-2xl leading-relaxed">Your produce lot has been registered and is now visible to verified buyers in the network. Awaiting buyer confirmation.</p>
+          <h1 className="font-display-md text-4xl font-bold text-[#154212] mb-2">{lot.crop} Lot Confirmed</h1>
+          <p className="font-body-lg text-[#5B755D] max-w-2xl leading-relaxed">
+            Your {lot.crop} lot ({lot.quantity} kg @ {formatCurrency(lot.price_per_kg)}/kg) has been registered and broadcasted to verified APMC buyers in real-time.
+          </p>
         </div>
       </div>
 

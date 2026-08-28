@@ -18,6 +18,7 @@ export default function FarmerDashboard() {
   const [transactions, setTransactions] = useState([]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [statusFeedback, setStatusFeedback] = useState(null);
+  const [liveBuyerAlert, setLiveBuyerAlert] = useState(null);
 
   // Form input state with coordinates & radius
   const [cropInput, setCropInput] = useState({
@@ -40,6 +41,48 @@ export default function FarmerDashboard() {
     fetchTransactions();
     // Auto-fetch initial recommendations
     fetchUnifiedRecommendations('Tomato (Roma)', 1500, 'Grade A', 'Pimpalgaon APMC, Nashik', 100);
+
+    // Subscribe to Realtime Buyer Actions
+    const channel = supabase
+      .channel('agriconnect_marketplace')
+      .on('broadcast', { event: 'lot_purchased' }, (eventPayload) => {
+        const data = eventPayload.payload;
+        if (data && data.lot) {
+          setLots((prev) =>
+            prev.map((l) =>
+              l.lot_id === data.lot.lot_id ? { ...l, status: 'sold', buyer_name: data.buyerName } : l
+            )
+          );
+          if (data.transaction) {
+            setTransactions((prev) => [data.transaction, ...prev.filter((t) => t.id !== data.transaction.id)]);
+          }
+          setLiveBuyerAlert({
+            crop: data.lot.crop,
+            quantity: data.lot.quantity,
+            buyerName: data.buyerName || 'Verified APMC Buyer',
+            payout: data.transaction?.amount || (data.lot.quantity * data.lot.price_per_kg).toFixed(2),
+            type: 'purchase'
+          });
+        }
+      })
+      .on('broadcast', { event: 'lot_accepted' }, (eventPayload) => {
+        const data = eventPayload.payload;
+        if (data) {
+          setLiveBuyerAlert({
+            crop: data.crop || 'Produce Lot',
+            buyerName: data.buyerName || 'Buyer',
+            payout: data.payout,
+            type: 'accepted'
+          });
+          fetchLots();
+          fetchTransactions();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const getStoredLocalLots = () => {
@@ -310,6 +353,37 @@ export default function FarmerDashboard() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
+      {/* Real-time Buyer Action Notification Banner */}
+      {liveBuyerAlert && (
+        <div className="bg-[#154212] text-white p-4 rounded-2xl shadow-lg border border-[#2A6B25] flex items-center justify-between animate-bounce">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-[#A6E89B]">
+              <span className="material-symbols-outlined text-[24px]">
+                {liveBuyerAlert.type === 'accepted' ? 'check_circle' : 'paid'}
+              </span>
+            </div>
+            <div>
+              <p className="font-label-lg font-bold">
+                {liveBuyerAlert.type === 'accepted'
+                  ? `🎉 Delivery Accepted! Payment of ₹${liveBuyerAlert.payout} cleared for ${liveBuyerAlert.crop}`
+                  : `⚡ Buyer Deal Confirmed: ${liveBuyerAlert.buyerName} has secured Escrow for your ${liveBuyerAlert.crop} (${liveBuyerAlert.quantity} kg @ ₹${liveBuyerAlert.payout})!`}
+              </p>
+              <p className="text-xs text-[#A6E89B]">
+                {liveBuyerAlert.type === 'accepted'
+                  ? 'Funds are available in your Escrow & Payments account'
+                  : 'Escrow payment locked in MSAMB trust account — proceed with dispatch'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setLiveBuyerAlert(null)}
+            className="text-xs bg-white/20 hover:bg-white/30 px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-4">
         <div>
