@@ -7,20 +7,32 @@ import { API_BASE_URL } from '../apiConfig';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('agriconnect_token'));
+  const [token, setToken] = useState(() => localStorage.getItem('agriconnect_token'));
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('agriconnect_user');
+    try {
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Ensure default language flag is set to avoid redirect loops
+    if (!localStorage.getItem('agriconnect_lang_set')) {
+      localStorage.setItem('agriconnect_lang_set', 'true');
+    }
+
     if (token) {
-      fetchUser(token);
+      validateSession(token);
     } else {
       setLoading(false);
     }
   }, [token]);
 
-  const fetchUser = async (authToken) => {
+  const validateSession = async (authToken) => {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: {
@@ -30,42 +42,38 @@ export const AuthProvider = ({ children }) => {
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
+        localStorage.setItem('agriconnect_user', JSON.stringify(userData));
         if (userData.preferred_language) {
           i18n.changeLanguage(userData.preferred_language);
         }
-      } else {
+      } else if (response.status === 401) {
+        // Only clear if token is genuinely rejected
         logout();
       }
     } catch (error) {
-      console.error('Failed to fetch user', error);
-      // Fallback demo user if backend is reconnecting
-      const storedRole = localStorage.getItem('agriconnect_demo_role') || 'farmer';
-      setUser({
-        id: 'demo-user-1',
-        name: 'Murugan (Farmer)',
-        role: storedRole,
-        phone: '+919443123456',
-        preferred_language: i18n.language || 'ta',
-        is_admin: storedRole === 'admin'
-      });
+      console.warn('Backend sync note (using cached credentials):', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const login = async (phoneOrEmail, passwordOrOtp) => {
-    // Attempt client-side Supabase authentication if email provided
-    if (phoneOrEmail && phoneOrEmail.includes('@')) {
+  const login = async (phoneOrEmail, password) => {
+    setErrorState(null);
+    const identifier = phoneOrEmail.trim();
+
+    // 1. Authenticate with Supabase client directly if valid email
+    if (identifier.includes('@')) {
       try {
         await supabase.auth.signInWithPassword({
-          email: phoneOrEmail.trim(),
-          password: passwordOrOtp
+          email: identifier,
+          password: password
         });
       } catch (sbErr) {
-        console.warn('Client Supabase direct sign-in note:', sbErr);
+        console.warn('Supabase client sign-in note:', sbErr);
       }
     }
 
+    // 2. Authenticate with Backend API
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
@@ -73,9 +81,9 @@ export const AuthProvider = ({ children }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone_or_email: phoneOrEmail,
-          password_or_otp: passwordOrOtp,
-          preferred_language: i18n.language || 'ta'
+          phone_or_email: identifier,
+          password_or_otp: password,
+          preferred_language: i18n.language || 'mr'
         }),
       });
 
@@ -83,38 +91,30 @@ export const AuthProvider = ({ children }) => {
         const data = await response.json();
         setToken(data.access_token);
         localStorage.setItem('agriconnect_token', data.access_token);
+        
         if (data.user) {
           setUser(data.user);
-          localStorage.setItem('agriconnect_demo_role', data.user.role);
+          localStorage.setItem('agriconnect_user', JSON.stringify(data.user));
           if (data.user.preferred_language) {
             i18n.changeLanguage(data.user.preferred_language);
           }
         }
-        return true;
+        setLoading(false);
+        return { success: true, user: data.user };
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        return { success: false, error: errData.detail || 'Invalid email or password' };
       }
     } catch (e) {
-      console.error('Login error', e);
+      console.error('Login network error:', e);
+      return { success: false, error: 'Unable to connect to server. Please check your connection.' };
     }
-
-    // Client-side demo fallback
-    const mockToken = `mock_token_${Date.now()}`;
-    const role = phoneOrEmail.includes('admin') ? 'admin' : (phoneOrEmail.includes('buyer') ? 'buyer' : 'farmer');
-    setToken(mockToken);
-    localStorage.setItem('agriconnect_token', mockToken);
-    localStorage.setItem('agriconnect_demo_role', role);
-    setUser({
-      id: `user-${role}-1`,
-      name: role === 'admin' ? 'Platform Admin' : (role === 'buyer' ? 'Green Grocers Ltd.' : 'Ram Singh (Farmer)'),
-      role: role,
-      phone: phoneOrEmail,
-      preferred_language: i18n.language || 'ta',
-      is_admin: role === 'admin'
-    });
-    return true;
   };
 
   const register = async (userData) => {
-    // Also sign up on Supabase client
+    const identifier = (userData.email || userData.phone || '').trim();
+
+    // 1. Sign up on Supabase Auth
     if (userData.email && userData.email.includes('@')) {
       try {
         await supabase.auth.signUp({
@@ -124,15 +124,18 @@ export const AuthProvider = ({ children }) => {
             data: {
               name: userData.name,
               role: userData.role || 'farmer',
-              preferred_language: i18n.language || 'ta'
+              phone: userData.phone || '',
+              location: userData.location || 'Nashik, Maharashtra',
+              preferred_language: i18n.language || 'mr'
             }
           }
         });
       } catch (sbErr) {
-        console.warn('Client Supabase direct sign-up note:', sbErr);
+        console.warn('Supabase direct signup note:', sbErr);
       }
     }
 
+    // 2. Register on Backend API & database
     try {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
@@ -141,10 +144,11 @@ export const AuthProvider = ({ children }) => {
         },
         body: JSON.stringify({
           name: userData.name,
-          phone_or_email: userData.email,
+          phone_or_email: identifier,
           password_or_otp: userData.password,
           role: userData.role || 'farmer',
-          preferred_language: i18n.language || 'ta'
+          location: userData.location || 'Nashik, Maharashtra',
+          preferred_language: i18n.language || 'mr'
         }),
       });
 
@@ -152,18 +156,24 @@ export const AuthProvider = ({ children }) => {
         const data = await response.json();
         setToken(data.access_token);
         localStorage.setItem('agriconnect_token', data.access_token);
+        
         if (data.user) {
           setUser(data.user);
-          localStorage.setItem('agriconnect_demo_role', data.user.role);
+          localStorage.setItem('agriconnect_user', JSON.stringify(data.user));
+          if (data.user.preferred_language) {
+            i18n.changeLanguage(data.user.preferred_language);
+          }
         }
-        return true;
+        setLoading(false);
+        return { success: true, user: data.user };
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        return { success: false, error: errData.detail || 'Registration failed' };
       }
     } catch (e) {
-      console.error('Register error', e);
+      console.error('Registration network error:', e);
+      return { success: false, error: 'Registration failed due to network error.' };
     }
-
-    // Client fallback
-    return await login(userData.email, userData.password);
   };
 
   const logout = async () => {
@@ -175,9 +185,11 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setToken(null);
     localStorage.removeItem('agriconnect_token');
-    localStorage.removeItem('agriconnect_demo_role');
+    localStorage.removeItem('agriconnect_user');
     navigate('/login');
   };
+
+  const [errorState, setErrorState] = useState(null);
 
   return (
     <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>

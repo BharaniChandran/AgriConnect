@@ -286,15 +286,41 @@ def login(req: schemas.UserAuthRequest):
 
 @app.get("/auth/me", response_model=schemas.UserProfileResponse)
 def read_current_user(current_user: AuthenticatedUser = Depends(get_current_user)):
-    user_data = STORE_USERS.get(current_user.id, {
+    # 1. Check in-memory store
+    if current_user.id in STORE_USERS:
+        return schemas.UserProfileResponse(**STORE_USERS[current_user.id])
+        
+    # 2. Check Supabase DB table
+    try:
+        admin_client = get_supabase_admin_client()
+        table_name = "farmers" if current_user.role == "farmer" else "buyers"
+        res = admin_client.table(table_name).select("*").eq("id", current_user.id).execute()
+        if res.data and len(res.data) > 0:
+            row = res.data[0]
+            user_data = {
+                "id": str(row["id"]),
+                "name": row.get("name", current_user.name),
+                "location": row.get("location", "Nashik, Maharashtra"),
+                "phone": row.get("phone", current_user.phone),
+                "preferred_language": row.get("preferred_language", current_user.preferred_language or "mr"),
+                "role": current_user.role,
+                "is_admin": row.get("is_admin", current_user.is_admin)
+            }
+            STORE_USERS[current_user.id] = user_data
+            return schemas.UserProfileResponse(**user_data)
+    except Exception as e:
+        print(f"Supabase auth/me lookup note: {e}")
+
+    # 3. Fallback to claims in token
+    user_data = {
         "id": current_user.id,
         "name": current_user.name,
-        "location": "Tamil Nadu, India",
+        "location": "Nashik, Maharashtra",
         "phone": current_user.phone,
-        "preferred_language": current_user.preferred_language,
+        "preferred_language": current_user.preferred_language or "mr",
         "role": current_user.role,
         "is_admin": current_user.is_admin
-    })
+    }
     return schemas.UserProfileResponse(**user_data)
 
 @app.post("/users/{user_id}/language")
@@ -312,7 +338,7 @@ def is_valid_uuid(val: Any) -> bool:
     except ValueError:
         return False
 
-def sync_user_to_supabase_profile(user_id: str, role: str, name: str = "", location: str = "", phone: str = "", preferred_language: str = "ta"):
+def sync_user_to_supabase_profile(user_id: str, role: str, name: str = "", location: str = "", phone: str = "", preferred_language: str = "mr"):
     """Ensure user profile is present in Supabase farmers or buyers table."""
     if not is_valid_uuid(user_id):
         return
@@ -322,13 +348,14 @@ def sync_user_to_supabase_profile(user_id: str, role: str, name: str = "", locat
         admin_client.table(table_name).upsert({
             "id": user_id,
             "name": name or "Agri User",
-            "location": location or "Tamil Nadu",
-            "phone": phone or "+919443123456",
-            "preferred_language": preferred_language or "ta",
+            "location": location or "Nashik, Maharashtra",
+            "phone": phone or "+919822123456",
+            "preferred_language": preferred_language or "mr",
             "is_admin": role == "admin"
         }).execute()
     except Exception as e:
         print(f"Supabase profile sync note: {e}")
+
 
 # --- Lots Endpoints ---
 @app.get("/lots", response_model=List[schemas.CropLotResponse])

@@ -19,19 +19,6 @@ export default function Layout({ children }) {
     localStorage.setItem('agriconnect_lang_set', 'true');
   };
 
-  const switchRole = async (targetRole) => {
-    if (targetRole === 'farmer') {
-      await login('+919822123456', 'password123');
-      navigate('/');
-    } else if (targetRole === 'buyer') {
-      await login('+919820012345', 'password123');
-      navigate('/');
-    } else if (targetRole === 'admin') {
-      await login('+919999999999', 'admin123');
-      navigate('/admin-resolution');
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-[#FCFBF9] text-[#154212] font-body-md font-medium">
       
@@ -185,31 +172,9 @@ export default function Layout({ children }) {
             )}
           </nav>
 
-          {/* Right Header: Switch Role, Language Pill & User Profile */}
+          {/* Right Header: Language Pill & User Profile */}
           <div className="hidden md:flex items-center gap-3">
-            
-            {/* Quick Role Switcher Pill for Testing */}
-            <div className="flex items-center bg-[#EFEBE3] p-1 rounded-xl border border-[#E8E2D9] text-xs font-bold">
-              <span className="px-2 text-[#5B755D] text-[11px] uppercase tracking-wider">Role:</span>
-              <button 
-                onClick={() => switchRole('farmer')} 
-                className={`px-2.5 py-1 rounded-lg transition-colors ${user?.role === 'farmer' ? 'bg-[#154212] text-white' : 'text-[#334D35] hover:bg-white/50'}`}
-              >
-                Farmer
-              </button>
-              <button 
-                onClick={() => switchRole('buyer')} 
-                className={`px-2.5 py-1 rounded-lg transition-colors ${user?.role === 'buyer' ? 'bg-[#154212] text-white' : 'text-[#334D35] hover:bg-white/50'}`}
-              >
-                Buyer
-              </button>
-              <button 
-                onClick={() => switchRole('admin')} 
-                className={`px-2.5 py-1 rounded-lg transition-colors ${user?.role === 'admin' ? 'bg-[#154212] text-white' : 'text-[#334D35] hover:bg-white/50'}`}
-              >
-                Admin
-              </button>
-            </div>
+
 
             {/* Quick Language Pill */}
             <div className="flex items-center bg-[#EFEBE3] p-1 rounded-xl border border-[#E8E2D9] text-xs font-bold">

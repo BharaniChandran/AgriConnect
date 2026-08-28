@@ -8,7 +8,8 @@ export default function AuthScreen({ initialTab = 'login' }) {
     email: '',
     password: '',
     name: '',
-    role: 'buyer'
+    role: 'farmer',
+    location: 'Nashik, Maharashtra'
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,13 +37,19 @@ export default function AuthScreen({ initialTab = 'login' }) {
     setLoading(true);
     
     if (activeTab === 'login') {
-      const success = await login(formData.email, formData.password);
-      if (success) navigate('/');
-      else setError('Invalid email or password');
+      const result = await login(formData.email, formData.password);
+      if (result.success) {
+        navigate('/', { replace: true });
+      } else {
+        setError(result.error || 'Invalid email or password');
+      }
     } else {
-      const success = await register(formData);
-      if (success) navigate('/');
-      else setError('Registration failed. Email may be in use.');
+      const result = await register(formData);
+      if (result.success) {
+        navigate('/', { replace: true });
+      } else {
+        setError(result.error || 'Registration failed. Email or phone may already be registered.');
+      }
     }
     setLoading(false);
   };
@@ -52,13 +59,13 @@ export default function AuthScreen({ initialTab = 'login' }) {
       
       {/* Full Width Top Header */}
       <header className="flex justify-between items-center px-8 py-5 bg-[#F7F4F0] shrink-0 border-b border-[#E8E2D9]">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
           <span className="material-symbols-outlined text-[28px] text-[#154212]">energy_savings_leaf</span>
           <span className="font-display-sm text-[22px] font-bold tracking-tight text-[#154212]">AgriConnect</span>
         </div>
-        <button className="flex items-center gap-1 font-label-md text-[#154212] hover:opacity-80 transition-opacity">
-          <span className="material-symbols-outlined text-[20px]">help</span> Help
-        </button>
+        <div className="text-xs text-[#5B755D] font-bold uppercase tracking-wider bg-[#EFEBE3] px-3 py-1.5 rounded-full border border-[#E8E2D9]">
+          Secure Production Portal
+        </div>
       </header>
       
       {/* Split Screen Main Area */}
@@ -68,38 +75,42 @@ export default function AuthScreen({ initialTab = 'login' }) {
         <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-end p-8 bg-cover bg-center" 
              style={{ backgroundImage: "url('https://images.pexels.com/photos/1595104/pexels-photo-1595104.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2')" }}>
           
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
           
-          <div className="relative z-10 bg-[#F7F4F0] rounded-xl p-10 max-w-md shadow-lg border border-[#E8E2D9]">
-            <h2 className="font-display-md text-[#154212] leading-tight mb-4 font-bold text-3xl">Empowering Rural Commerce.</h2>
-            <p className="font-body-lg text-[#334D35] leading-relaxed">
-              Connect directly with buyers, manage your crops, and grow your agricultural business with modern tools designed for you.
+          <div className="relative z-10 bg-[#F7F4F0] rounded-2xl p-8 max-w-md shadow-xl border border-[#E8E2D9]">
+            <h2 className="font-display-md text-[#154212] leading-tight mb-3 font-bold text-2xl">
+              Maharashtra APMC Marketplace
+            </h2>
+            <p className="font-body-md text-[#334D35] leading-relaxed">
+              Connect directly with verified buyers, track real-time MSAMB mandi arrivals, predict crop prices, and secure escrow payouts.
             </p>
           </div>
         </div>
 
         {/* Right Side - Form */}
-        <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 bg-[#FCFBF9] overflow-y-auto">
-          <div className="w-full max-w-[420px] py-8">
+        <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-6 md:p-12 bg-[#FCFBF9] overflow-y-auto">
+          <div className="w-full max-w-[420px] py-4">
             
             <div className="text-center mb-8">
-              <h1 className="font-display-md text-[#154212] font-bold text-4xl mb-3">
-                {activeTab === 'login' ? 'Welcome Back' : 'Join AgriConnect'}
+              <h1 className="font-display-md text-[#154212] font-bold text-3xl mb-2">
+                {activeTab === 'login' ? 'Welcome Back' : 'Create Your Account'}
               </h1>
-              <p className="font-body-md text-[#334D35]">
-                {activeTab === 'login' ? 'Login to manage your agricultural business.' : 'Create a new account'}
+              <p className="font-body-md text-[#5B755D]">
+                {activeTab === 'login' ? 'Sign in to access your dashboard' : 'Join AgriConnect to trade across Maharashtra APMCs'}
               </p>
             </div>
 
             {/* Tabs */}
-            <div className="flex w-full mb-8 border-b border-[#E8E2D9]">
+            <div className="flex w-full mb-6 border-b border-[#E8E2D9]">
               <button 
+                type="button"
                 onClick={() => handleTabSwitch('login')}
                 className={`flex-1 pb-3 font-label-lg font-bold transition-colors ${activeTab === 'login' ? 'border-b-[3px] border-[#154212] text-[#154212]' : 'text-[#5B755D] hover:text-[#154212]'}`}
               >
-                Login
+                Sign In
               </button>
               <button 
+                type="button"
                 onClick={() => handleTabSwitch('register')}
                 className={`flex-1 pb-3 font-label-lg font-bold transition-colors ${activeTab === 'register' ? 'border-b-[3px] border-[#154212] text-[#154212]' : 'text-[#5B755D] hover:text-[#154212]'}`}
               >
@@ -108,137 +119,146 @@ export default function AuthScreen({ initialTab = 'login' }) {
             </div>
 
             {error && (
-              <div className="bg-[#FFDAD6] text-[#410002] p-4 rounded-xl mb-6 text-center font-body-sm">
-                {error}
+              <div className="bg-[#FFDAD6] text-[#410002] p-3.5 rounded-xl mb-5 text-sm font-medium border border-[#FFB4AB] flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">error</span>
+                <span>{error}</span>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {activeTab === 'register' && (
                 <>
-                  <div className="relative">
-                    <input 
-                      name="name" type="text" placeholder="Full Name" required
-                      value={formData.name} onChange={handleChange}
-                      className="w-full bg-[#EFEBE3] border border-[#E8E2D9] focus:border-[#154212] py-4 px-5 pr-12 rounded-lg outline-none text-[#154212] placeholder:text-[#5B755D] transition-colors"
-                    />
-                    <div className="absolute inset-y-0 right-0 pr-5 flex items-center pointer-events-none">
-                      <span className="material-symbols-outlined text-[#5B755D] text-[20px]">person</span>
+                  <div>
+                    <label className="block text-xs font-bold text-[#334D35] uppercase mb-1">Account Role</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, role: 'farmer' })}
+                        className={`p-3 rounded-lg border text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                          formData.role === 'farmer' 
+                            ? 'bg-[#154212] text-white border-[#154212] shadow-sm' 
+                            : 'bg-[#EFEBE3] text-[#334D35] border-[#E8E2D9]'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">agriculture</span>
+                        <span>Farmer</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, role: 'buyer' })}
+                        className={`p-3 rounded-lg border text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                          formData.role === 'buyer' 
+                            ? 'bg-[#154212] text-white border-[#154212] shadow-sm' 
+                            : 'bg-[#EFEBE3] text-[#334D35] border-[#E8E2D9]'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">storefront</span>
+                        <span>Buyer</span>
+                      </button>
                     </div>
                   </div>
-                  <div className="relative">
-                    <select 
-                      name="role" value={formData.role} onChange={handleChange}
-                      className="w-full bg-[#EFEBE3] border border-[#E8E2D9] focus:border-[#154212] py-4 px-5 pr-12 rounded-lg outline-none text-[#154212] appearance-none transition-colors"
-                    >
-                      <option value="buyer">I am a Buyer</option>
-                      <option value="farmer">I am a Farmer</option>
-                      <option value="admin">I am an Admin</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 pr-5 flex items-center pointer-events-none">
-                      <span className="material-symbols-outlined text-[#5B755D] text-[20px]">badge</span>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#334D35] uppercase mb-1">Full Name</label>
+                    <div className="relative">
+                      <input 
+                        name="name" 
+                        type="text" 
+                        placeholder="e.g. Rajesh Patil" 
+                        required
+                        value={formData.name} 
+                        onChange={handleChange}
+                        className="w-full bg-[#EFEBE3] border border-[#E8E2D9] focus:border-[#154212] py-3.5 px-4 pr-10 rounded-lg outline-none text-[#154212] placeholder:text-[#8C9E8E] text-sm"
+                      />
+                      <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-[#5B755D]">
+                        <span className="material-symbols-outlined text-[18px]">person</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#334D35] uppercase mb-1">District / Mandi Location</label>
+                    <div className="relative">
+                      <input 
+                        name="location" 
+                        type="text" 
+                        placeholder="e.g. Pimpalgaon APMC, Nashik" 
+                        required
+                        value={formData.location} 
+                        onChange={handleChange}
+                        className="w-full bg-[#EFEBE3] border border-[#E8E2D9] focus:border-[#154212] py-3.5 px-4 pr-10 rounded-lg outline-none text-[#154212] placeholder:text-[#8C9E8E] text-sm"
+                      />
+                      <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-[#5B755D]">
+                        <span className="material-symbols-outlined text-[18px]">location_on</span>
+                      </div>
                     </div>
                   </div>
                 </>
               )}
 
-              <div className="relative">
-                <input 
-                  name="email" 
-                  type={activeTab === 'login' ? 'text' : 'email'} 
-                  placeholder={activeTab === 'login' ? 'Phone Number or Email (e.g. +919443123456)' : 'Email Address'} 
-                  required
-                  value={formData.email} 
-                  onChange={handleChange}
-                  className="w-full bg-[#EFEBE3] border border-[#E8E2D9] focus:border-[#154212] py-4 px-5 pr-12 rounded-lg outline-none text-[#154212] placeholder:text-[#5B755D] transition-colors font-medium"
-                />
-                <div className="absolute inset-y-0 right-0 pr-5 flex items-center pointer-events-none">
-                  <span className="material-symbols-outlined text-[#5B755D] text-[20px]">{activeTab === 'login' ? 'smartphone' : 'mail'}</span>
+              <div>
+                <label className="block text-xs font-bold text-[#334D35] uppercase mb-1">
+                  {activeTab === 'login' ? 'Email or Phone' : 'Email Address'}
+                </label>
+                <div className="relative">
+                  <input 
+                    name="email" 
+                    type={activeTab === 'login' ? 'text' : 'email'} 
+                    placeholder={activeTab === 'login' ? 'e.g. user@example.com or +919822123456' : 'e.g. farmer@example.com'} 
+                    required
+                    value={formData.email} 
+                    onChange={handleChange}
+                    className="w-full bg-[#EFEBE3] border border-[#E8E2D9] focus:border-[#154212] py-3.5 px-4 pr-10 rounded-lg outline-none text-[#154212] placeholder:text-[#8C9E8E] text-sm font-medium"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-[#5B755D]">
+                    <span className="material-symbols-outlined text-[18px]">
+                      {activeTab === 'login' ? 'account_circle' : 'mail'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="relative">
-                <input 
-                  name="password" type="password" placeholder="Password" required minLength="6"
-                  value={formData.password} onChange={handleChange}
-                  className="w-full bg-[#EFEBE3] border border-[#E8E2D9] focus:border-[#154212] py-4 px-5 pr-12 rounded-lg outline-none text-[#154212] placeholder:text-[#5B755D] transition-colors"
-                />
-                <div className="absolute inset-y-0 right-0 pr-5 flex items-center cursor-pointer hover:text-[#154212] transition-colors text-[#5B755D]">
-                  <span className="material-symbols-outlined text-[20px]">visibility</span>
+              <div>
+                <label className="block text-xs font-bold text-[#334D35] uppercase mb-1">Password</label>
+                <div className="relative">
+                  <input 
+                    name="password" 
+                    type="password" 
+                    placeholder="Enter your password" 
+                    required 
+                    minLength="6"
+                    value={formData.password} 
+                    onChange={handleChange}
+                    className="w-full bg-[#EFEBE3] border border-[#E8E2D9] focus:border-[#154212] py-3.5 px-4 pr-10 rounded-lg outline-none text-[#154212] placeholder:text-[#8C9E8E] text-sm"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#5B755D]">
+                    <span className="material-symbols-outlined text-[18px]">lock</span>
+                  </div>
                 </div>
               </div>
 
-              {activeTab === 'login' && (
-                <div className="flex justify-between items-center py-1">
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input type="checkbox" defaultChecked className="accent-[#154212] w-4 h-4 rounded" />
-                    <span className="font-body-sm text-[#334D35]">Remember me</span>
-                  </label>
-                  <span className="font-label-sm font-bold text-[#154212] hover:underline cursor-pointer">Default pass: password123</span>
-                </div>
-              )}
-
-              <button disabled={loading} type="submit" className="w-full bg-[#154212] text-white font-label-lg font-bold py-4 rounded-lg flex items-center justify-center gap-2 hover:bg-[#0E2C14] transition-colors disabled:opacity-70 mt-4 shadow-sm">
-                {loading ? 'Signing in...' : (activeTab === 'login' ? 'Login' : 'Create Account')}
-                <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+              <button 
+                disabled={loading} 
+                type="submit" 
+                className="w-full bg-[#154212] text-white font-label-lg font-bold py-3.5 rounded-lg flex items-center justify-center gap-2 hover:bg-[#0E2C14] transition-all disabled:opacity-60 mt-6 shadow-md"
+              >
+                {loading ? 'Processing...' : (activeTab === 'login' ? 'Sign In' : 'Create Account')}
+                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </button>
             </form>
 
-            {/* Quick Demo Login Cards */}
-            <div className="mt-8 pt-6 border-t border-[#E8E2D9]">
-              <div className="text-center font-label-xs text-[#5B755D] font-bold uppercase tracking-widest mb-3">
-                ⚡ Quick 1-Click Demo Logins
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setLoading(true);
-                    await login('+919443123456', 'password123');
-                    navigate('/');
-                  }}
-                  className="bg-[#EFEBE3] hover:bg-[#154212] hover:text-white text-[#154212] p-2.5 rounded-lg text-xs font-bold transition-colors flex flex-col items-center gap-1 border border-[#E8E2D9]"
-                >
-                  <span className="material-symbols-outlined text-[18px]">agriculture</span>
-                  <span>Farmer</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setLoading(true);
-                    await login('+919884012345', 'password123');
-                    navigate('/');
-                  }}
-                  className="bg-[#EFEBE3] hover:bg-[#154212] hover:text-white text-[#154212] p-2.5 rounded-lg text-xs font-bold transition-colors flex flex-col items-center gap-1 border border-[#E8E2D9]"
-                >
-                  <span className="material-symbols-outlined text-[18px]">storefront</span>
-                  <span>Buyer</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setLoading(true);
-                    await login('+919999999999', 'admin123');
-                    navigate('/admin-resolution');
-                  }}
-                  className="bg-[#EFEBE3] hover:bg-[#154212] hover:text-white text-[#154212] p-2.5 rounded-lg text-xs font-bold transition-colors flex flex-col items-center gap-1 border border-[#E8E2D9]"
-                >
-                  <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
-                  <span>Admin</span>
-                </button>
-              </div>
+            <div className="mt-8 text-center text-xs text-[#5B755D]">
+              Protected by Supabase Authentication & encrypted SSL transmission.
             </div>
           </div>
         </div>
       </main>
 
       {/* Full Width Footer */}
-      <footer className="flex flex-col sm:flex-row justify-between items-center px-8 py-6 bg-[#F7F4F0] border-t border-[#E8E2D9] shrink-0">
-        <p className="font-body-sm text-[#334D35] font-medium">© 2024 AgriConnect. Empowering rural commerce.</p>
-        <div className="flex gap-6 font-label-sm text-[#154212] font-bold mt-4 sm:mt-0">
-          <a href="#" className="hover:underline">Privacy Policy</a>
-          <a href="#" className="hover:underline">Terms of Service</a>
-          <a href="#" className="hover:underline">Support</a>
+      <footer className="flex flex-col sm:flex-row justify-between items-center px-8 py-5 bg-[#F7F4F0] border-t border-[#E8E2D9] shrink-0 text-xs text-[#5B755D]">
+        <p>© 2026 AgriConnect. Maharashtra Agricultural Marketing Board Pilot.</p>
+        <div className="flex gap-6 font-bold text-[#154212] mt-2 sm:mt-0">
+          <span>Official APMC Gateway</span>
         </div>
       </footer>
     </div>
