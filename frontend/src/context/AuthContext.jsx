@@ -247,28 +247,46 @@ export const AuthProvider = ({ children }) => {
       backendError = 'Unable to connect to backend server';
     }
 
+    // 2. Firebase Authentication
     if (identifier.includes('@')) {
       try {
-        const userCred = await createUserWithEmailAndPassword(firebaseAuth, identifier, userData.password).catch(() => null);
-        if (userCred && userCred.user) {
-          await updateProfile(userCred.user, {
-            displayName: userData.name || 'Agri User'
-          });
-          try {
-            await setDoc(doc(firestoreDb, 'users', userCred.user.uid), {
-              name: userData.name || 'Agri User',
-              email: identifier,
-              role: userData.role || 'farmer',
-              location: userData.location || 'Nashik, Maharashtra',
-              preferred_language: i18n.language || 'mr',
-              created_at: new Date().toISOString()
-            });
-          } catch (fsErr) {
-            console.warn('Firestore doc write note:', fsErr);
+        let userCred = null;
+        try {
+          userCred = await createUserWithEmailAndPassword(firebaseAuth, identifier, userData.password);
+        } catch (createErr) {
+          // If already registered in Firebase, sign in
+          if (createErr.code === 'auth/email-already-in-use') {
+            userCred = await signInWithEmailAndPassword(firebaseAuth, identifier, userData.password).catch(() => null);
+          } else {
+            console.warn('Firebase create error:', createErr);
           }
         }
+
+        if (userCred && userCred.user) {
+          const fbUser = userCred.user;
+          updateProfile(fbUser, { displayName: userData.name || 'Agri User' }).catch(() => {});
+
+          const fbToken = await fbUser.getIdToken().catch(() => `token_${fbUser.uid}`);
+          const activeUser = {
+            id: fbUser.uid,
+            name: userData.name || fbUser.displayName || 'Agri User',
+            location: userData.location || 'Nashik, Maharashtra',
+            phone: identifier.includes('@') ? '' : identifier,
+            email: fbUser.email || identifier,
+            preferred_language: i18n.language || 'mr',
+            role: userData.role || 'farmer',
+            is_admin: userData.role === 'admin'
+          };
+
+          setToken(fbToken);
+          localStorage.setItem('agriconnect_token', fbToken);
+          setUser(activeUser);
+          localStorage.setItem('agriconnect_user', JSON.stringify(activeUser));
+          setLoading(false);
+          return { success: true, user: activeUser };
+        }
       } catch (fbErr) {
-        console.warn('Firebase registration note:', fbErr);
+        console.warn('Firebase registration flow note:', fbErr);
       }
     }
 
