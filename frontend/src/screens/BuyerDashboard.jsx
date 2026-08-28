@@ -5,8 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
 import { API_BASE_URL } from '../apiConfig';
 import { supabase } from '../supabaseClient';
-import { db as firestoreDb } from '../firebaseClient';
+import { db as firestoreDb, rtdb } from '../firebaseClient';
 import { collection, onSnapshot } from 'firebase/firestore';
+import { ref as dbRef, onValue } from 'firebase/database';
 import { calculateDistanceKm, estimateTransitDuration } from '../utils/distance';
 
 export default function BuyerDashboard() {
@@ -52,7 +53,33 @@ export default function BuyerDashboard() {
       console.warn('Firestore onSnapshot init note:', fsErr);
     }
 
-    // 2. Subscribe to Supabase Broadcast & DB Realtime Channel
+    // 2. Subscribe to Firebase Realtime Database Live Lots
+    let unsubscribeRtdb = () => {};
+    try {
+      const rtdbLotsRef = dbRef(rtdb, 'crops_lots');
+      unsubscribeRtdb = onValue(rtdbLotsRef, (snapshot) => {
+        const val = snapshot.val();
+        if (val) {
+          const liveLots = Object.values(val).filter((l) => l && l.status === 'available');
+          if (liveLots.length > 0) {
+            setLots((prev) => {
+              const map = new Map();
+              liveLots.forEach((l) => map.set(l.lot_id, l));
+              prev.forEach((l) => {
+                if (!map.has(l.lot_id)) map.set(l.lot_id, l);
+              });
+              return Array.from(map.values()).filter((l) => l.status === 'available');
+            });
+          }
+        }
+      }, (err) => {
+        console.warn('RTDB onValue note:', err);
+      });
+    } catch (rtdbErr) {
+      console.warn('RTDB init note:', rtdbErr);
+    }
+
+    // 3. Subscribe to Supabase Broadcast & DB Realtime Channel
     const channel = supabase
       .channel('agriconnect_marketplace')
       .on('broadcast', { event: 'lot_created' }, (eventPayload) => {
@@ -87,6 +114,7 @@ export default function BuyerDashboard() {
 
     return () => {
       unsubscribeFirestore();
+      if (typeof unsubscribeRtdb === 'function') unsubscribeRtdb();
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
