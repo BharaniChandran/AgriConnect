@@ -8,8 +8,8 @@ class UserAuthRequest(BaseModel):
     password_or_otp: str
     role: str = "farmer" # "farmer" or "buyer"
     name: Optional[str] = "Agri User"
-    location: Optional[str] = "Tamil Nadu, India"
-    preferred_language: str = "ta"
+    location: Optional[str] = "Nashik, Maharashtra"
+    preferred_language: str = "mr"
 
 class UserProfileResponse(BaseModel):
     id: str
@@ -31,8 +31,9 @@ class CropLotCreate(BaseModel):
     crop: str
     quantity: float = Field(..., gt=0)
     quality: str = "Grade A"
-    location: str = "Madurai, Tamil Nadu"
+    location: str = "Pimpalgaon APMC, Nashik"
     price_per_kg: float = Field(..., gt=0)
+
 
 class CropLotResponse(BaseModel):
     lot_id: str

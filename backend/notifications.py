@@ -7,15 +7,24 @@ import os
 
 # Multi-language notification templates
 TEMPLATES: Dict[str, Dict[str, str]] = {
-    "ta": { # Tamil (Default for Tamil Nadu)
-        "offer_received": "வணக்கம் {name}! உங்கள் {crop} பயிருக்கான புதிய சலுகை ₹{amount} வந்துள்ளது. AgriConnect தளத்தில் பார்க்கவும்.",
-        "lot_accepted": "வணக்கம் {name}! உங்கள் {quantity}kg {crop} லாட்டை வாங்குபவர் ஏற்றுக்கொண்டுள்ளார். வாகனம் தயாராக உள்ளது.",
-        "payment_held": "வணக்கம் {name}! உங்கள் ₹{amount} தொகை பாதுகாப்பாக நிறுத்தி வைக்கப்பட்டுள்ளது. டெலிவரி முடிந்ததும் விடுவிக்கப்படும்.",
-        "payment_released": "வணக்கம் {name}! உங்கள் {crop} லாட்டிற்கான ₹{amount} தொகை உங்கள் கணக்கில் வரவு வைக்கப்பட்டுள்ளது.",
-        "dispute_raised": "கவனம் {name}! டெலிவரி #{tx_id}-க்கு வாங்குபவர் மறுப்பு/சர்ச்சை எழுப்பியுள்ளார் ({reason}). விவரங்களை மதிப்பாய்வு செய்யவும்.",
-        "dispute_resolved": "வணக்கம் {name}! டெலிவரி #{tx_id} சர்ச்சை தீர்க்கப்பட்டது: {resolution}."
+    "mr": { # Marathi (Default for Maharashtra)
+        "offer_received": "नमस्कार {name}! आपल्या {crop} शेतमालासाठी ₹{amount} ची नवीन मागणी आली आहे. AgriConnect वर पहा.",
+        "lot_accepted": "नमस्कार {name}! खरेदीदाराने आपला {quantity}kg {crop} माल स्वीकारला आहे. वाहतूक वाहन सज्ज आहे.",
+        "payment_held": "नमस्कार {name}! ₹{amount} ची रक्कम एस्क्रो खात्यात सुरक्षित ठेवण्यात आली आहे. डिलिव्हरी पूर्ण झाल्यावर वर्ग केली जाईल.",
+        "payment_released": "नमस्कार {name}! आपल्या {crop} मालाचे ₹{amount} आपल्या बँक खात्यात वर्ग करण्यात आले आहेत.",
+        "dispute_raised": "सूचना {name}! डिलिव्हरी #{tx_id} वर खरेदीदाराने आक्षेप नोंदवला आहे ({reason}). कृपया तपशील तपासा.",
+        "dispute_resolved": "नमस्कार {name}! डिलिव्हरी #{tx_id} चा वाद यशस्वीरित्या सोडवला गेला आहे: {resolution}."
+    },
+    "gu": { # Gujarati (Interstate trade)
+        "offer_received": "નમસ્તે {name}! તમારા {crop} પાક માટે ₹{amount} ની નવી ઓફર આવી છે. AgriConnect પર જુઓ.",
+        "lot_accepted": "નમસ્તે {name}! ખરીદદારે તમારા {quantity}kg {crop} નો લોટ સ્વીકાર્યો છે.",
+        "payment_held": "નમસ્તે {name}! ₹{amount} ની ચુકવણી એસ્ક્રોમાં સુરક્ષિત રીતે રોકવામાં આવી છે.",
+        "payment_released": "નમસ્તે {name}! તમારા {crop} પાકના ₹{amount} તમારા ખાતામાં જમા કરવામાં આવ્યા છે.",
+        "dispute_raised": "ધ્યાન આપો {name}! ડિલિવરી #{tx_id} પર વિવાદ નોંધાયેલ છે ({reason}).",
+        "dispute_resolved": "નમસ્તે {name}! ડિલિવરી #{tx_id} નો વિવાદ ઉકેલાઈ ગયો છે: {resolution}."
     },
     "en": { # English
+
         "offer_received": "Hello {name}! You have received a new offer of ₹{amount} for your {crop}. Check AgriConnect.",
         "lot_accepted": "Hello {name}! The buyer has accepted your lot of {quantity}kg {crop}. Transport is ready.",
         "payment_held": "Hello {name}! Payment of ₹{amount} is securely held in escrow until delivery is verified.",
@@ -66,7 +75,11 @@ def get_message(template_key: str, lang: str, **kwargs) -> str:
 async def send_sms_notification(phone: str, lang: str, template_key: str, **kwargs) -> bool:
     """Send localized SMS notification using configured provider (Twilio / MSG91 / Mock)."""
     message_text = get_message(template_key, lang, **kwargs)
-    print(f"[SMS to {phone} in '{lang}']: {message_text}")
+    try:
+        print(f"[SMS to {phone} in '{lang}']: {message_text}")
+    except UnicodeEncodeError:
+        safe_msg = message_text.encode('ascii', errors='backslashreplace').decode('ascii')
+        print(f"[SMS to {phone} in '{lang}']: {safe_msg}")
     
     # Check Twilio configuration
     sid = os.environ.get("SMS_PROVIDER_SID")
@@ -85,5 +98,9 @@ async def send_sms_notification(phone: str, lang: str, template_key: str, **kwar
 async def send_email_notification(email: str, lang: str, subject: str, template_key: str, **kwargs) -> bool:
     """Send localized email notification."""
     message_text = get_message(template_key, lang, **kwargs)
-    print(f"[Email to {email} in '{lang}'] Subject: {subject} | Body: {message_text}")
+    try:
+        print(f"[Email to {email} in '{lang}'] Subject: {subject} | Body: {message_text}")
+    except UnicodeEncodeError:
+        safe_msg = message_text.encode('ascii', errors='backslashreplace').decode('ascii')
+        print(f"[Email to {email} in '{lang}'] Subject: {subject} | Body: {safe_msg}")
     return True

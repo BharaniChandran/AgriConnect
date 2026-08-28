@@ -15,14 +15,14 @@ def test_register_and_login_full_flow():
         "phone_or_email": "+919876500001",
         "password_or_otp": "password123",
         "role": "farmer",
-        "location": "Thanjavur, Tamil Nadu",
-        "preferred_language": "ta"
+        "location": "Pimpalgaon, Nashik, Maharashtra",
+        "preferred_language": "mr"
     })
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
     assert data["user"]["phone"] == "+919876500001"
-    assert data["user"]["preferred_language"] == "ta"
+    assert data["user"]["preferred_language"] == "mr"
 
     # 2. Login Farmer
     response = client.post("/auth/login", json={
@@ -37,25 +37,25 @@ def test_register_and_login_full_flow():
 
     # 3. Create Lot (Farmer)
     response = client.post("/lots", json={
-        "crop": "Paddy (Ponni)",
+        "crop": "Tomato (Roma)",
         "quantity": 2000.0,
         "quality": "Grade A",
-        "location": "Thanjavur Mandi",
-        "price_per_kg": 26.5
+        "location": "Pimpalgaon APMC, Nashik",
+        "price_per_kg": 28.5
     }, headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     lot_data = response.json()
-    assert lot_data["crop"] == "Paddy (Ponni)"
+    assert lot_data["crop"] == "Tomato (Roma)"
     lot_id = lot_data["lot_id"]
 
     # 4. Register Buyer
     response = client.post("/auth/register", json={
-        "name": "Chennai Millers Ltd",
+        "name": "Mumbai Fresh Millers Ltd",
         "phone_or_email": "+919876500002",
         "password_or_otp": "password123",
         "role": "buyer",
-        "location": "Chennai, Tamil Nadu",
-        "preferred_language": "ta"
+        "location": "Vashi APMC, Navi Mumbai",
+        "preferred_language": "mr"
     })
     assert response.status_code == 200
     buyer_token = response.json()["access_token"]

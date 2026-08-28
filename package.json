@@ -1,0 +1,10 @@
+{
+  "name": "agriconnect",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "dev:frontend": "cd frontend && npm run dev",
+    "preview": "cd frontend && npm run preview"
+  }
+}

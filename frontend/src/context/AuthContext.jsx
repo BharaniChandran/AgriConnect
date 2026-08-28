@@ -1,6 +1,8 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import i18n from '../i18n';
+import { supabase } from '../supabaseClient';
+import { API_BASE_URL } from '../apiConfig';
 
 const AuthContext = createContext(null);
 
@@ -20,7 +22,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async (authToken) => {
     try {
-      const response = await fetch('http://localhost:8000/auth/me', {
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -52,8 +54,20 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (phoneOrEmail, passwordOrOtp) => {
+    // Attempt client-side Supabase authentication if email provided
+    if (phoneOrEmail && phoneOrEmail.includes('@')) {
+      try {
+        await supabase.auth.signInWithPassword({
+          email: phoneOrEmail.trim(),
+          password: passwordOrOtp
+        });
+      } catch (sbErr) {
+        console.warn('Client Supabase direct sign-in note:', sbErr);
+      }
+    }
+
     try {
-      const response = await fetch('http://localhost:8000/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -100,8 +114,27 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (userData) => {
+    // Also sign up on Supabase client
+    if (userData.email && userData.email.includes('@')) {
+      try {
+        await supabase.auth.signUp({
+          email: userData.email.trim(),
+          password: userData.password,
+          options: {
+            data: {
+              name: userData.name,
+              role: userData.role || 'farmer',
+              preferred_language: i18n.language || 'ta'
+            }
+          }
+        });
+      } catch (sbErr) {
+        console.warn('Client Supabase direct sign-up note:', sbErr);
+      }
+    }
+
     try {
-      const response = await fetch('http://localhost:8000/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -133,7 +166,12 @@ export const AuthProvider = ({ children }) => {
     return await login(userData.email, userData.password);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('Supabase signOut error:', e);
+    }
     setUser(null);
     setToken(null);
     localStorage.removeItem('agriconnect_token');

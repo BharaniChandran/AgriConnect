@@ -144,9 +144,13 @@ export default function AuthScreen({ initialTab = 'login' }) {
 
               <div className="relative">
                 <input 
-                  name="email" type="email" placeholder={activeTab === 'login' ? 'Phone Number' : 'Email Address'} required
-                  value={formData.email} onChange={handleChange}
-                  className="w-full bg-[#EFEBE3] border border-[#E8E2D9] focus:border-[#154212] py-4 px-5 pr-12 rounded-lg outline-none text-[#154212] placeholder:text-[#5B755D] transition-colors"
+                  name="email" 
+                  type={activeTab === 'login' ? 'text' : 'email'} 
+                  placeholder={activeTab === 'login' ? 'Phone Number or Email (e.g. +919443123456)' : 'Email Address'} 
+                  required
+                  value={formData.email} 
+                  onChange={handleChange}
+                  className="w-full bg-[#EFEBE3] border border-[#E8E2D9] focus:border-[#154212] py-4 px-5 pr-12 rounded-lg outline-none text-[#154212] placeholder:text-[#5B755D] transition-colors font-medium"
                 />
                 <div className="absolute inset-y-0 right-0 pr-5 flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-[#5B755D] text-[20px]">{activeTab === 'login' ? 'smartphone' : 'mail'}</span>
@@ -167,48 +171,63 @@ export default function AuthScreen({ initialTab = 'login' }) {
               {activeTab === 'login' && (
                 <div className="flex justify-between items-center py-1">
                   <label className="flex items-center gap-2 cursor-pointer group">
-                    <div className="w-5 h-5 rounded border border-[#C6C0B5] bg-[#EFEBE3] group-hover:border-[#154212] flex items-center justify-center transition-colors"></div>
-                    <span className="font-body-md text-[#334D35]">Remember me</span>
+                    <input type="checkbox" defaultChecked className="accent-[#154212] w-4 h-4 rounded" />
+                    <span className="font-body-sm text-[#334D35]">Remember me</span>
                   </label>
-                  <a href="#" className="font-label-md font-bold text-[#154212] hover:underline">Forgot Password?</a>
+                  <span className="font-label-sm font-bold text-[#154212] hover:underline cursor-pointer">Default pass: password123</span>
                 </div>
               )}
 
-              <button disabled={loading} type="submit" className="w-full bg-[#154212] text-white font-label-lg font-bold py-4 rounded-lg flex items-center justify-center gap-2 hover:bg-[#0E2C14] transition-colors disabled:opacity-70 mt-4">
-                {activeTab === 'login' ? 'Login' : 'Create Account'}
+              <button disabled={loading} type="submit" className="w-full bg-[#154212] text-white font-label-lg font-bold py-4 rounded-lg flex items-center justify-center gap-2 hover:bg-[#0E2C14] transition-colors disabled:opacity-70 mt-4 shadow-sm">
+                {loading ? 'Signing in...' : (activeTab === 'login' ? 'Login' : 'Create Account')}
                 <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
               </button>
             </form>
 
-            {activeTab === 'login' && (
-              <>
-                <div className="flex items-center gap-4 my-7">
-                  <div className="h-px bg-[#E8E2D9] flex-1"></div>
-                  <span className="font-body-sm text-[#5B755D]">OR</span>
-                  <div className="h-px bg-[#E8E2D9] flex-1"></div>
-                </div>
-
-                <button className="w-full border-2 border-[#154212] bg-transparent text-[#154212] font-label-lg font-bold py-3.5 rounded-lg flex items-center justify-center gap-2 hover:bg-[#F7F4F0] transition-colors mb-7">
-                  <span className="material-symbols-outlined text-[20px]">pin</span>
-                  Login with OTP
+            {/* Quick Demo Login Cards */}
+            <div className="mt-8 pt-6 border-t border-[#E8E2D9]">
+              <div className="text-center font-label-xs text-[#5B755D] font-bold uppercase tracking-widest mb-3">
+                ⚡ Quick 1-Click Demo Logins
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setLoading(true);
+                    await login('+919443123456', 'password123');
+                    navigate('/');
+                  }}
+                  className="bg-[#EFEBE3] hover:bg-[#154212] hover:text-white text-[#154212] p-2.5 rounded-lg text-xs font-bold transition-colors flex flex-col items-center gap-1 border border-[#E8E2D9]"
+                >
+                  <span className="material-symbols-outlined text-[18px]">agriculture</span>
+                  <span>Farmer</span>
                 </button>
-
-                <div className="text-center font-label-sm text-[#5B755D] font-bold uppercase tracking-widest mb-4">
-                  OR CONTINUE WITH
-                </div>
-
-                <div className="flex gap-4">
-                  <button className="flex-1 border border-[#E8E2D9] bg-white py-3.5 rounded-lg font-label-lg font-bold text-[#154212] flex items-center justify-center gap-2 hover:bg-[#F7F4F0] transition-colors">
-                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
-                    Google
-                  </button>
-                  <button className="flex-1 border border-[#E8E2D9] bg-white py-3.5 rounded-lg font-label-lg font-bold text-[#154212] flex items-center justify-center gap-2 hover:bg-[#F7F4F0] transition-colors">
-                    <img src="https://www.svgrepo.com/show/475647/facebook-color.svg" alt="Facebook" className="w-5 h-5" />
-                    Facebook
-                  </button>
-                </div>
-              </>
-            )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setLoading(true);
+                    await login('+919884012345', 'password123');
+                    navigate('/');
+                  }}
+                  className="bg-[#EFEBE3] hover:bg-[#154212] hover:text-white text-[#154212] p-2.5 rounded-lg text-xs font-bold transition-colors flex flex-col items-center gap-1 border border-[#E8E2D9]"
+                >
+                  <span className="material-symbols-outlined text-[18px]">storefront</span>
+                  <span>Buyer</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setLoading(true);
+                    await login('+919999999999', 'admin123');
+                    navigate('/admin-resolution');
+                  }}
+                  className="bg-[#EFEBE3] hover:bg-[#154212] hover:text-white text-[#154212] p-2.5 rounded-lg text-xs font-bold transition-colors flex flex-col items-center gap-1 border border-[#E8E2D9]"
+                >
+                  <span className="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+                  <span>Admin</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </main>

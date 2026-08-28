@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 import datetime
 import uuid
 
@@ -19,10 +19,13 @@ from auth import (
 import notifications
 import payments
 import market_data
+import recommendations
+import predictor
+import train_price_model
 
 # In-memory / mock persistent store for cross-environment testing
 # (Works directly with Postgres models in memory or Supabase)
-app = FastAPI(title="AgriConnect Tamil Nadu API", version="2.0.0")
+app = FastAPI(title="AgriConnect Maharashtra API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,13 +35,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Handle /api prefix transparently for Vercel Serverless routing
+@app.middleware("http")
+async def handle_api_prefix(request, call_next):
+    raw_path = request.scope.get("path", "")
+    if raw_path.startswith("/api/"):
+        request.scope["path"] = raw_path[4:]
+    elif raw_path == "/api":
+        request.scope["path"] = "/"
+    return await call_next(request)
+
 # Simulated in-memory store for fallback/demo consistency
 STORE_USERS = {}
 STORE_LOTS = {}
 STORE_TRANSACTIONS = {}
 STORE_DISPUTES = {}
 
-# Seed initial demo data for Tamil Nadu pilot
+# Seed initial demo data for Maharashtra pilot
 def seed_demo_data():
     farmer_id = "farmer-101"
     buyer_id = "buyer-202"
@@ -46,10 +59,10 @@ def seed_demo_data():
 
     STORE_USERS[farmer_id] = {
         "id": farmer_id,
-        "name": "Ram Singh (Sunrise Farms)",
-        "location": "Oddanchatram, Dindigul, Tamil Nadu",
-        "phone": "+919443123456",
-        "preferred_language": "ta",
+        "name": "Ram Patil (Sahyadri Agro Farms)",
+        "location": "Pimpalgaon, Nashik, Maharashtra",
+        "phone": "+919822123456",
+        "preferred_language": "mr",
         "role": "farmer",
         "is_admin": False,
         "password_hash": get_password_hash("password123")
@@ -57,9 +70,9 @@ def seed_demo_data():
 
     STORE_USERS[buyer_id] = {
         "id": buyer_id,
-        "name": "Green Grocers Ltd.",
-        "location": "Koyambedu, Chennai, Tamil Nadu",
-        "phone": "+919884012345",
+        "name": "Mumbai Fresh Grocers Ltd.",
+        "location": "Vashi APMC, Navi Mumbai, Maharashtra",
+        "phone": "+919820012345",
         "preferred_language": "en",
         "role": "buyer",
         "is_admin": False,
@@ -69,9 +82,9 @@ def seed_demo_data():
     STORE_USERS[admin_id] = {
         "id": admin_id,
         "name": "Platform Admin (AgriConnect)",
-        "location": "Chennai, Tamil Nadu",
+        "location": "Pune, Maharashtra",
         "phone": "+919999999999",
-        "preferred_language": "en",
+        "preferred_language": "mr",
         "role": "admin",
         "is_admin": True,
         "password_hash": get_password_hash("admin123")
@@ -84,10 +97,10 @@ def seed_demo_data():
         "crop": "Tomato (Roma)",
         "quantity": 1250.0,
         "quality": "Grade A",
-        "location": "Oddanchatram Mandi, Dindigul",
-        "price_per_kg": 28.0,
+        "location": "Pimpalgaon APMC, Nashik",
+        "price_per_kg": 28.5,
         "status": "available",
-        "created_at": datetime.datetime.utcnow()
+        "created_at": datetime.datetime.now(datetime.timezone.utc)
     }
 
     tx_id = 1
@@ -97,13 +110,13 @@ def seed_demo_data():
         "buyer_id": buyer_id,
         "lot_id": lot_id,
         "quantity": 1250.0,
-        "price": 35000.0,
+        "price": 35625.0,
         "status": "delivered",
         "payment_status": "held",
-        "razorpay_order_id": "order_mock_tn_101",
-        "razorpay_payment_id": "pay_mock_tn_101",
-        "created_at": datetime.datetime.utcnow() - datetime.timedelta(days=2),
-        "updated_at": datetime.datetime.utcnow()
+        "razorpay_order_id": "order_mock_mh_101",
+        "razorpay_payment_id": "pay_mock_mh_101",
+        "created_at": datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=2),
+        "updated_at": datetime.datetime.now(datetime.timezone.utc)
     }
 
 seed_demo_data()
@@ -113,32 +126,102 @@ seed_demo_data()
 def root():
     return {
         "app": "AgriConnect API",
-        "pilot_region": "Tamil Nadu",
-        "supported_languages": ["ta", "en", "hi", "te", "kn", "ml"],
+        "pilot_region": "Maharashtra",
+        "pilot_district": "Nashik",
+        "supported_languages": ["mr", "hi", "en", "gu", "ta", "te", "kn", "ml"],
         "status": "online"
     }
+
 
 # --- Auth Endpoints ---
 @app.post("/auth/register", response_model=schemas.Token)
 def register(req: schemas.UserAuthRequest):
-    user_id = f"{req.role}-{uuid.uuid4().hex[:6]}"
+    raw_id = req.phone_or_email.strip()
+    is_email = "@" in raw_id
+    email = raw_id.lower() if is_email else f"{raw_id.replace('+', '')}@agriconnect.local"
+    
+    import ors_service
+    loc_lat, loc_lng = ors_service.geocode_location_to_lat_lon(req.location or "Tamil Nadu")
+
+    supabase_uid = None
+    try:
+        admin_client = get_supabase_admin_client()
+        sb_user_attrs = {
+            "email": email,
+            "password": req.password_or_otp or "Password123!",
+            "email_confirm": True,
+            "user_metadata": {
+                "name": req.name or "Agri User",
+                "role": req.role,
+                "location": req.location or "Nashik, Maharashtra",
+                "latitude": loc_lat,
+                "longitude": loc_lng,
+                "phone": raw_id,
+                "preferred_language": req.preferred_language or "mr",
+                "is_admin": req.role == "admin"
+            }
+        }
+        if not is_email and raw_id.startswith("+"):
+            sb_user_attrs["phone"] = raw_id
+
+        sb_res = admin_client.auth.admin.create_user(sb_user_attrs)
+        if sb_res and sb_res.user:
+            supabase_uid = str(sb_res.user.id)
+            print(f"Successfully stored email '{email}' in Supabase Auth. User ID: {supabase_uid}")
+    except Exception as e:
+        print(f"Supabase auth create_user note: {e}")
+        # If user already registered in Supabase, fetch existing user ID
+        try:
+            admin_client = get_supabase_admin_client()
+            users_list = admin_client.auth.admin.list_users()
+            for u in users_list:
+                if u.email == email or getattr(u, "phone", None) == raw_id:
+                    supabase_uid = str(u.id)
+                    break
+        except Exception as list_err:
+            print(f"Supabase list users error: {list_err}")
+
+    # Fallback ID if Supabase service was unreachable
+    user_id = supabase_uid if supabase_uid else f"{req.role}-{uuid.uuid4().hex[:6]}"
+    
     user_dict = {
         "id": user_id,
         "name": req.name or "Agri User",
         "location": req.location or "Tamil Nadu",
-        "phone": req.phone_or_email,
+        "latitude": loc_lat,
+        "longitude": loc_lng,
+        "phone": raw_id,
+        "email": email if is_email else "",
         "preferred_language": req.preferred_language or "ta",
         "role": req.role,
         "is_admin": req.role == "admin",
         "password_hash": get_password_hash(req.password_or_otp)
     }
     STORE_USERS[user_id] = user_dict
+
+    # Sync profile to Supabase database table if available
+    if supabase_uid:
+        try:
+            admin_client = get_supabase_admin_client()
+            table_name = "farmers" if req.role == "farmer" else "buyers"
+            admin_client.table(table_name).upsert({
+                "id": supabase_uid,
+                "name": user_dict["name"],
+                "location": user_dict["location"],
+                "phone": user_dict["phone"],
+                "preferred_language": user_dict["preferred_language"],
+                "is_admin": user_dict["is_admin"]
+            }).execute()
+        except Exception as sync_err:
+            print(f"Supabase profile table sync note: {sync_err}")
+
     
     token = create_access_token(data={
         "sub": user_id,
         "role": user_dict["role"],
         "name": user_dict["name"],
         "phone": user_dict["phone"],
+        "email": email,
         "preferred_language": user_dict["preferred_language"],
         "is_admin": user_dict["is_admin"]
     })
@@ -148,15 +231,45 @@ def register(req: schemas.UserAuthRequest):
 
 @app.post("/auth/login", response_model=schemas.Token)
 def login(req: schemas.UserAuthRequest):
-    # Find user by phone/email or matching username
+    raw_id = req.phone_or_email.strip()
+    is_email = "@" in raw_id
+    email = raw_id.lower() if is_email else f"{raw_id.replace('+', '')}@agriconnect.local"
+
+    # Find user by phone/email or matching username in memory
     found_user = None
     for u in STORE_USERS.values():
-        if u["phone"] == req.phone_or_email or u.get("email") == req.phone_or_email or u["name"] == req.phone_or_email:
+        if u["phone"] == raw_id or u.get("email") == email or u.get("email") == raw_id or u["name"] == raw_id:
             found_user = u
             break
             
     if not found_user:
-        # Auto-create if phone OTP demo
+        # Check Supabase Auth
+        try:
+            admin_client = get_supabase_admin_client()
+            users_list = admin_client.auth.admin.list_users()
+            for u in users_list:
+                if u.email == email or u.email == raw_id.lower() or getattr(u, "phone", None) == raw_id:
+                    meta = u.user_metadata or {}
+                    role = meta.get("role", req.role or "farmer")
+                    user_dict = {
+                        "id": str(u.id),
+                        "name": meta.get("name", req.name or "Agri User"),
+                        "location": meta.get("location", "Tamil Nadu"),
+                        "phone": meta.get("phone", raw_id),
+                        "email": u.email,
+                        "preferred_language": meta.get("preferred_language", "ta"),
+                        "role": role,
+                        "is_admin": meta.get("is_admin", role == "admin"),
+                        "password_hash": get_password_hash(req.password_or_otp)
+                    }
+                    STORE_USERS[str(u.id)] = user_dict
+                    found_user = user_dict
+                    break
+        except Exception as e:
+            print(f"Supabase auth login lookup note: {e}")
+
+    if not found_user:
+        # Auto-create if not found
         return register(req)
         
     token = create_access_token(data={
@@ -164,6 +277,7 @@ def login(req: schemas.UserAuthRequest):
         "role": found_user["role"],
         "name": found_user["name"],
         "phone": found_user["phone"],
+        "email": found_user.get("email", email),
         "preferred_language": found_user["preferred_language"],
         "is_admin": found_user["is_admin"]
     })
@@ -189,19 +303,56 @@ def update_user_language(user_id: str, language: str, current_user: Authenticate
         STORE_USERS[user_id]["preferred_language"] = language
     return {"message": "Language updated successfully", "preferred_language": language}
 
+def is_valid_uuid(val: Any) -> bool:
+    if not val or not isinstance(val, str):
+        return False
+    try:
+        uuid.UUID(val)
+        return True
+    except ValueError:
+        return False
+
+def sync_user_to_supabase_profile(user_id: str, role: str, name: str = "", location: str = "", phone: str = "", preferred_language: str = "ta"):
+    """Ensure user profile is present in Supabase farmers or buyers table."""
+    if not is_valid_uuid(user_id):
+        return
+    try:
+        admin_client = get_supabase_admin_client()
+        table_name = "farmers" if role == "farmer" else "buyers"
+        admin_client.table(table_name).upsert({
+            "id": user_id,
+            "name": name or "Agri User",
+            "location": location or "Tamil Nadu",
+            "phone": phone or "+919443123456",
+            "preferred_language": preferred_language or "ta",
+            "is_admin": role == "admin"
+        }).execute()
+    except Exception as e:
+        print(f"Supabase profile sync note: {e}")
+
 # --- Lots Endpoints ---
 @app.get("/lots", response_model=List[schemas.CropLotResponse])
 def list_lots():
-    return [schemas.CropLotResponse(**lot) for lot in STORE_LOTS.values() if lot["status"] == "available"]
+    # Sync from Supabase crops_lots table
+    try:
+        admin_client = get_supabase_admin_client()
+        res = admin_client.table("crops_lots").select("*").eq("status", "available").execute()
+        if res and res.data:
+            for r in res.data:
+                STORE_LOTS[r["lot_id"]] = r
+    except Exception as e:
+        print(f"Supabase list_lots sync note: {e}")
+
+    return [schemas.CropLotResponse(**lot) for lot in STORE_LOTS.values() if lot.get("status") == "available"]
 
 @app.post("/lots", response_model=schemas.CropLotResponse)
 def create_crop_lot(lot: schemas.CropLotCreate, current_user: AuthenticatedUser = Depends(get_current_user)):
     if current_user.role != "farmer":
         raise HTTPException(status_code=403, detail="Only farmers can list crops/lots")
         
-    lot_id = f"lot-{uuid.uuid4().hex[:6]}"
+    lot_uuid = str(uuid.uuid4())
     lot_dict = {
-        "lot_id": lot_id,
+        "lot_id": lot_uuid,
         "farmer_id": current_user.id,
         "crop": lot.crop,
         "quantity": lot.quantity,
@@ -211,13 +362,34 @@ def create_crop_lot(lot: schemas.CropLotCreate, current_user: AuthenticatedUser 
         "status": "available",
         "created_at": datetime.datetime.utcnow()
     }
-    STORE_LOTS[lot_id] = lot_dict
+    STORE_LOTS[lot_uuid] = lot_dict
+
+    # Sync to Supabase crops_lots table
+    try:
+        admin_client = get_supabase_admin_client()
+        farmer_uid = current_user.id if is_valid_uuid(current_user.id) else None
+        if farmer_uid:
+            sync_user_to_supabase_profile(farmer_uid, current_user.role, current_user.name, phone=current_user.phone)
+            admin_client.table("crops_lots").insert({
+                "lot_id": lot_uuid,
+                "farmer_id": farmer_uid,
+                "crop": lot.crop,
+                "quantity": float(lot.quantity),
+                "quality": lot.quality,
+                "location": lot.location,
+                "price_per_kg": float(lot.price_per_kg),
+                "status": "available"
+            }).execute()
+            print(f"Successfully synced lot '{lot.crop}' ({lot_uuid}) to Supabase DB 'crops_lots'")
+    except Exception as e:
+        print(f"Supabase lot insert sync note: {e}")
+
     return schemas.CropLotResponse(**lot_dict)
 
 # --- Live Market Prices ---
 @app.get("/market-prices")
 async def get_market_prices():
-    prices = await market_data.fetch_live_tn_agmarknet_prices()
+    prices = await market_data.fetch_live_mh_agmarknet_prices()
     return prices
 
 @app.post("/market-prices/ingest")
@@ -225,12 +397,190 @@ async def trigger_price_ingestion(admin: AuthenticatedUser = Depends(require_adm
     result = await market_data.ingest_market_prices_job()
     return result
 
+# --- Step 1: Best-Market Ranking (Deterministic Rule-Based) ---
+@app.get("/recommendations/best-market")
+async def get_best_market_ranking(
+    crop: str, 
+    quantity: float, 
+    farmer_location: str,
+    per_km_rate: Optional[float] = 15.0
+):
+    """
+    Returns candidate markets ranked by net profit:
+    net_profit = gross_revenue - transport_cost - wastage_cost
+    Pulls candidate market prices from live Supabase market_prices table.
+    """
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than 0 kg")
+    if not crop.strip():
+        raise HTTPException(status_code=400, detail="Crop parameter is required")
+    if not farmer_location.strip():
+        raise HTTPException(status_code=400, detail="Farmer location is required")
+        
+    try:
+        ranked_markets = await recommendations.calculate_best_markets(
+            crop=crop.strip(),
+            quantity=quantity,
+            farmer_location=farmer_location.strip(),
+            per_km_rate=per_km_rate or 15.0
+        )
+        return {
+            "crop": crop,
+            "quantity_kg": quantity,
+            "farmer_location": farmer_location,
+            "top_market": ranked_markets[0]["market"] if ranked_markets else None,
+            "max_net_profit": ranked_markets[0]["net_profit"] if ranked_markets else 0.0,
+            "markets": ranked_markets
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate best-market ranking: {str(e)}")
+
+# --- Step 2: Buyer Matching (ORS Real Distance & Net Price Ranking) ---
+@app.get("/recommendations/buyer-match")
+async def get_buyer_match_ranking(
+    crop: str,
+    quantity: float,
+    quality: Optional[str] = "Grade A",
+    location: Optional[str] = "Nashik, Maharashtra",
+    farmer_lat: Optional[float] = None,
+    farmer_lng: Optional[float] = None,
+    radius_km: Optional[float] = 100.0,
+    price_per_kg: Optional[float] = None
+):
+    """
+    Finds buyers within real driving distance (ORS Matrix / Haversine fallback),
+    filters by radius_km, and ranks by net price to farmer (price_offered - transport_cost - wastage_cost).
+    """
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than 0 kg")
+    if not crop.strip():
+        raise HTTPException(status_code=400, detail="Crop parameter is required")
+        
+    try:
+        matched_buyers = await recommendations.calculate_buyer_matches(
+            crop=crop.strip(),
+            quantity=quantity,
+            quality=quality or "Grade A",
+            location=location or "Nashik, Maharashtra",
+            farmer_lat=farmer_lat,
+            farmer_lng=farmer_lng,
+            radius_km=radius_km if radius_km is not None else 100.0,
+            price_per_kg=price_per_kg
+        )
+        return {
+            "crop": crop,
+            "quantity_kg": quantity,
+            "quality": quality,
+            "location": location,
+            "radius_km": radius_km if radius_km is not None else 100.0,
+            "farmer_lat": farmer_lat,
+            "farmer_lng": farmer_lng,
+            "top_buyer": matched_buyers[0]["name"] if matched_buyers else None,
+            "top_net_price_per_kg": matched_buyers[0]["net_price_per_kg"] if matched_buyers else 0.0,
+            "top_net_payout": matched_buyers[0]["net_payout"] if matched_buyers else 0.0,
+            "buyers": matched_buyers
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate buyer match ranking: {str(e)}")
+
+
+# --- Step 3: Price Prediction (ML Serving & Scheduled Retraining) ---
+@app.get("/predictions/price")
+async def get_price_prediction(
+    crop: str,
+    market: str,
+    days_ahead: Optional[int] = 3
+):
+    """
+    ML Serving: Loads saved model artifact and predicts next 1-3 day prices for crop at market.
+    """
+    if not crop.strip():
+        raise HTTPException(status_code=400, detail="Crop parameter is required")
+    if not market.strip():
+        raise HTTPException(status_code=400, detail="Market parameter is required")
+        
+    try:
+        prediction_result = await predictor.predict_crop_price(
+            crop=crop.strip(),
+            market=market.strip(),
+            days_ahead=min(7, max(1, days_ahead or 3))
+        )
+        return prediction_result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Price prediction error: {str(e)}")
+
+@app.post("/predictions/retrain")
+def trigger_model_retraining(background_tasks: BackgroundTasks, admin: AuthenticatedUser = Depends(require_admin_user)):
+    """
+    Scheduled / On-Demand Retraining: Retrains price prediction model on latest Supabase market_prices data.
+    """
+    def retrain_task():
+        train_price_model.train_and_evaluate()
+        predictor.reload_model_artifact()
+
+    background_tasks.add_task(retrain_task)
+    return {
+        "status": "training_initiated",
+        "message": "Model retraining job queued in background on latest Agmarknet market prices.",
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+    }
+
+# --- Step 4: Unified Farmer Recommendation Flow ---
+@app.get("/recommendations/unified")
+async def get_unified_recommendation(
+    crop: str,
+    quantity: float,
+    quality: Optional[str] = "Grade A",
+    location: Optional[str] = "Nashik, Maharashtra",
+    farmer_lat: Optional[float] = None,
+    farmer_lng: Optional[float] = None,
+    radius_km: Optional[float] = 100.0,
+    price_per_kg: Optional[float] = None
+):
+    """
+    Unified Endpoint: Returns top market ranking, net profit, ML price forecast trend, and ranked buyers.
+    """
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than 0 kg")
+    if not crop.strip():
+        raise HTTPException(status_code=400, detail="Crop parameter is required")
+        
+    try:
+        result = await recommendations.calculate_unified_recommendation(
+            crop=crop.strip(),
+            quantity=quantity,
+            quality=quality or "Grade A",
+            location=location or "Nashik, Maharashtra",
+            farmer_lat=farmer_lat,
+            farmer_lng=farmer_lng,
+            radius_km=radius_km if radius_km is not None else 100.0,
+            price_per_kg=price_per_kg
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unified recommendation failed: {str(e)}")
+
+
+
+
+
+
 # --- Transactions Endpoints ---
 @app.get("/transactions", response_model=List[schemas.TransactionResponse])
 def list_transactions(current_user: AuthenticatedUser = Depends(get_current_user)):
+    # Sync from Supabase transactions table
+    try:
+        admin_client = get_supabase_admin_client()
+        res = admin_client.table("transactions").select("*").execute()
+        if res and res.data:
+            for r in res.data:
+                STORE_TRANSACTIONS[r["id"]] = r
+    except Exception as e:
+        print(f"Supabase list_transactions sync note: {e}")
+
     txs = []
     for tx in STORE_TRANSACTIONS.values():
-        if current_user.is_admin or tx["farmer_id"] == current_user.id or tx["buyer_id"] == current_user.id:
+        if current_user.is_admin or tx.get("farmer_id") == current_user.id or tx.get("buyer_id") == current_user.id:
             txs.append(schemas.TransactionResponse(**tx))
     return txs
 
@@ -240,19 +590,40 @@ async def create_transaction(req: schemas.TransactionCreate, current_user: Authe
         raise HTTPException(status_code=403, detail="Only buyers can create transactions")
         
     lot = STORE_LOTS.get(req.lot_id)
-    if not lot or lot["status"] != "available":
-        raise HTTPException(status_code=400, detail="Requested lot is no longer available")
-        
-    lot["status"] = "sold"
+    if not lot:
+        # Check Supabase crops_lots table
+        try:
+            admin_client = get_supabase_admin_client()
+            res = admin_client.table("crops_lots").select("*").eq("lot_id", req.lot_id).execute()
+            if res and res.data:
+                lot = res.data[0]
+                STORE_LOTS[req.lot_id] = lot
+        except Exception as e:
+            print(f"Supabase lot lookup note: {e}")
+
+    if not lot:
+        # Fallback create demo lot if not found
+        lot = {
+            "lot_id": req.lot_id,
+            "farmer_id": "farmer-101",
+            "crop": "Tomato (Roma)",
+            "quantity": 500.0,
+            "price_per_kg": 28.0,
+            "status": "sold"
+        }
+        STORE_LOTS[req.lot_id] = lot
+    else:
+        lot["status"] = "sold"
+
     tx_id = len(STORE_TRANSACTIONS) + 1
-    total_price = lot["price_per_kg"] * (req.quantity or lot["quantity"])
+    total_price = float(lot["price_per_kg"]) * float(req.quantity or lot["quantity"])
     
     tx_dict = {
         "id": tx_id,
         "farmer_id": lot["farmer_id"],
         "buyer_id": current_user.id,
         "lot_id": lot["lot_id"],
-        "quantity": req.quantity or lot["quantity"],
+        "quantity": float(req.quantity or lot["quantity"]),
         "price": total_price,
         "status": "in_transit",
         "payment_status": "held", # Payment held upon checkout
@@ -261,6 +632,37 @@ async def create_transaction(req: schemas.TransactionCreate, current_user: Authe
         "created_at": datetime.datetime.utcnow(),
         "updated_at": datetime.datetime.utcnow()
     }
+
+    # Sync to Supabase transactions table
+    try:
+        admin_client = get_supabase_admin_client()
+        farmer_uid = lot["farmer_id"] if is_valid_uuid(lot.get("farmer_id")) else None
+        buyer_uid = current_user.id if is_valid_uuid(current_user.id) else None
+        lot_uuid = lot["lot_id"] if is_valid_uuid(lot.get("lot_id")) else None
+
+        if farmer_uid and buyer_uid:
+            sync_user_to_supabase_profile(buyer_uid, current_user.role, current_user.name, phone=current_user.phone)
+            tx_res = admin_client.table("transactions").insert({
+                "farmer_id": farmer_uid,
+                "buyer_id": buyer_uid,
+                "lot_id": lot_uuid,
+                "quantity": tx_dict["quantity"],
+                "price": tx_dict["price"],
+                "status": "in_transit",
+                "payment_status": "held",
+                "razorpay_order_id": tx_dict["razorpay_order_id"],
+                "razorpay_payment_id": tx_dict["razorpay_payment_id"]
+            }).execute()
+            if tx_res.data and len(tx_res.data) > 0:
+                tx_id = tx_res.data[0]["id"]
+                tx_dict["id"] = tx_id
+                print(f"Successfully synced transaction #{tx_id} to Supabase DB 'transactions'")
+                
+        if lot_uuid:
+            admin_client.table("crops_lots").update({"status": "sold"}).eq("lot_id", lot_uuid).execute()
+    except Exception as e:
+        print(f"Supabase transaction insert sync note: {e}")
+
     STORE_TRANSACTIONS[tx_id] = tx_dict
     
     # Send SMS / Email notification to farmer in their preferred language
@@ -277,6 +679,58 @@ async def create_transaction(req: schemas.TransactionCreate, current_user: Authe
     
     return schemas.TransactionResponse(**tx_dict)
 
+@app.post("/transactions/{id}/accept")
+async def accept_transaction(
+    id: int, 
+    current_user: AuthenticatedUser = Depends(get_current_user)
+):
+    tx = STORE_TRANSACTIONS.get(id)
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+        
+    if not current_user.is_admin and tx.get("buyer_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the buyer can accept this delivery")
+        
+    tx["status"] = "delivered"
+    tx["payment_status"] = "released"
+    tx["updated_at"] = datetime.datetime.utcnow()
+    
+    # Release payment to farmer
+    payments.release_payout_to_farmer(tx["farmer_id"], float(tx["price"]), tx["id"])
+    
+    # Sync to Supabase
+    try:
+        admin_client = get_supabase_admin_client()
+        admin_client.table("transactions").update({
+            "status": "delivered",
+            "payment_status": "released",
+            "updated_at": datetime.datetime.utcnow().isoformat()
+        }).eq("id", id).execute()
+    except Exception as e:
+        print(f"Supabase transaction accept sync note: {e}")
+        
+    # Send notification to farmer
+    farmer = STORE_USERS.get(tx["farmer_id"], {})
+    farmer_lang = farmer.get("preferred_language", "ta")
+    lot = STORE_LOTS.get(tx["lot_id"], {})
+    crop_name = lot.get("crop", "Produce")
+    
+    await notifications.send_sms_notification(
+        phone=farmer.get("phone", "+919443123456"),
+        lang=farmer_lang,
+        template_key="payment_released",
+        name=farmer.get("name", "Farmer"),
+        crop=crop_name,
+        amount=tx["price"]
+    )
+    
+    return {
+        "message": "Delivery accepted and payment released to farmer successfully",
+        "status": "delivered",
+        "payment_status": "released",
+        "transaction": tx
+    }
+
 # --- Dispute & Refund Path (Task 3) ---
 @app.post("/transactions/{id}/reject", response_model=schemas.DisputeResponse)
 async def reject_transaction(
@@ -288,7 +742,7 @@ async def reject_transaction(
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
         
-    if not current_user.is_admin and tx["buyer_id"] != current_user.id:
+    if not current_user.is_admin and tx.get("buyer_id") != current_user.id:
         raise HTTPException(status_code=403, detail="Only the buyer can reject this lot")
         
     # Validation 1: Rejection quantity cannot exceed total delivered quantity
@@ -324,6 +778,29 @@ async def reject_transaction(
         "resolved_at": None
     }
     STORE_DISPUTES[id] = dispute_dict
+
+    # Sync to Supabase disputes and transactions tables
+    try:
+        admin_client = get_supabase_admin_client()
+        admin_client.table("transactions").update({
+            "status": "disputed",
+            "updated_at": datetime.datetime.utcnow().isoformat()
+        }).eq("id", tx["id"]).execute()
+        
+        sb_disp = admin_client.table("disputes").insert({
+            "transaction_id": tx["id"],
+            "raised_by": "buyer",
+            "reason": request.reason,
+            "description": request.description,
+            "rejected_quantity_kg": float(request.rejected_quantity_kg),
+            "photo_urls": request.photo_urls,
+            "status": "open"
+        }).execute()
+        if sb_disp.data and len(sb_disp.data) > 0:
+            dispute_dict["dispute_id"] = sb_disp.data[0]["dispute_id"]
+            print(f"Successfully synced dispute #{dispute_dict['dispute_id']} to Supabase DB 'disputes'")
+    except Exception as e:
+        print(f"Supabase dispute sync note: {e}")
     
     # Notify farmer in their preferred language
     farmer = STORE_USERS.get(tx["farmer_id"], {})
@@ -343,6 +820,17 @@ async def reject_transaction(
 def get_transaction_dispute(id: int, current_user: AuthenticatedUser = Depends(get_current_user)):
     dispute = STORE_DISPUTES.get(id)
     if not dispute:
+        # Check Supabase disputes table
+        try:
+            admin_client = get_supabase_admin_client()
+            res = admin_client.table("disputes").select("*").eq("transaction_id", id).execute()
+            if res and res.data:
+                dispute = res.data[0]
+                STORE_DISPUTES[id] = dispute
+        except Exception as e:
+            print(f"Supabase dispute lookup note: {e}")
+
+    if not dispute:
         raise HTTPException(status_code=404, detail="No active dispute found for this transaction")
     return schemas.DisputeResponse(**dispute)
 
@@ -357,7 +845,7 @@ async def resolve_transaction_dispute(
     if not tx or not dispute:
         raise HTTPException(status_code=404, detail="Transaction or Dispute not found")
         
-    if dispute["status"] == "resolved":
+    if dispute.get("status") == "resolved":
         raise HTTPException(status_code=400, detail="Dispute has already been resolved")
         
     valid_resolutions = ["partial_refund", "full_refund", "buyer_accepts", "farmer_resale"]
@@ -368,9 +856,9 @@ async def resolve_transaction_dispute(
     dispute["resolution"] = request.resolution
     dispute["resolved_at"] = datetime.datetime.utcnow()
     
-    total_amount = tx["price"]
-    rejected_qty = dispute["rejected_quantity_kg"]
-    total_qty = tx["quantity"]
+    total_amount = float(tx["price"])
+    rejected_qty = float(dispute["rejected_quantity_kg"])
+    total_qty = float(tx["quantity"])
     rejected_portion_amount = round((rejected_qty / total_qty) * total_amount, 2)
     accepted_portion_amount = round(total_amount - rejected_portion_amount, 2)
     
@@ -381,7 +869,7 @@ async def resolve_transaction_dispute(
         refund_res = payments.refund_payment(
             payment_id=tx.get("razorpay_payment_id", "pay_mock_1"),
             amount_inr=total_amount,
-            notes={"dispute_id": dispute["dispute_id"], "reason": "Full refund on buyer rejection"}
+            notes={"dispute_id": dispute.get("dispute_id", id), "reason": "Full refund on buyer rejection"}
         )
         tx["razorpay_refund_id"] = refund_res.get("id")
         
@@ -392,7 +880,7 @@ async def resolve_transaction_dispute(
         refund_res = payments.refund_payment(
             payment_id=tx.get("razorpay_payment_id", "pay_mock_1"),
             amount_inr=rejected_portion_amount,
-            notes={"dispute_id": dispute["dispute_id"], "reason": f"Partial refund for {rejected_qty}kg"}
+            notes={"dispute_id": dispute.get("dispute_id", id), "reason": f"Partial refund for {rejected_qty}kg"}
         )
         tx["razorpay_refund_id"] = refund_res.get("id")
         # Release remainder to farmer
@@ -407,6 +895,25 @@ async def resolve_transaction_dispute(
     tx["status"] = "paid"
     tx["updated_at"] = datetime.datetime.utcnow()
     
+    # Sync resolution to Supabase
+    try:
+        admin_client = get_supabase_admin_client()
+        admin_client.table("disputes").update({
+            "status": "resolved",
+            "resolution": request.resolution,
+            "resolved_at": datetime.datetime.utcnow().isoformat()
+        }).eq("transaction_id", id).execute()
+        
+        admin_client.table("transactions").update({
+            "status": "paid",
+            "payment_status": tx["payment_status"],
+            "razorpay_refund_id": tx.get("razorpay_refund_id"),
+            "updated_at": datetime.datetime.utcnow().isoformat()
+        }).eq("id", id).execute()
+        print(f"Successfully synced dispute resolution for Tx #{id} to Supabase DB")
+    except Exception as e:
+        print(f"Supabase dispute resolve sync note: {e}")
+
     # Notify both parties in their preferred languages
     farmer = STORE_USERS.get(tx["farmer_id"], {})
     buyer = STORE_USERS.get(tx["buyer_id"], {})
@@ -463,15 +970,20 @@ async def upload_dispute_evidence(
     storage_path = f"disputes/{uuid.uuid4().hex}_{file.filename}"
     
     # Upload to Supabase Storage bucket 'dispute-evidence' via admin client
+    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/dispute-evidence/{storage_path}"
     try:
         admin_client = get_supabase_admin_client()
-        # admin_client.storage.from_('dispute-evidence').upload(storage_path, contents)
+        admin_client.storage.from_('dispute-evidence').upload(
+            storage_path, 
+            contents, 
+            file_options={"content-type": file.content_type}
+        )
     except Exception as e:
-        print(f"Supabase storage mock note: {e}")
+        print(f"Supabase storage upload note: {e}")
         
     return {
         "storage_path": storage_path,
-        "url": f"https://storage.agriconnect.in/dispute-evidence/{storage_path}"
+        "url": public_url
     }
 
 # --- Razorpay Payments Endpoints (Task 4) ---
@@ -507,3 +1019,28 @@ def verify_payment(req: schemas.RazorpayPaymentVerify, current_user: Authenticat
     tx["payment_status"] = "held" # Provably held in escrow until delivery/resolution
     tx["status"] = "in_transit"
     return {"status": "success", "payment_status": "held", "message": "Payment captured and held in escrow"}
+
+# --- Static Frontend Serving for Production Unified Deployment ---
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+if os.path.exists(dist_dir):
+    assets_dir = os.path.join(dist_dir, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa_frontend(full_path: str):
+        # Exclude internal API or documentation paths
+        if full_path.startswith("docs") or full_path.startswith("redoc") or full_path.startswith("openapi.json"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        file_path = os.path.join(dist_dir, full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        index_file = os.path.join(dist_dir, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="Page not found")
+

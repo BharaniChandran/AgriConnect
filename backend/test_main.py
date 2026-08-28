@@ -12,45 +12,46 @@ def test_root_status():
     response = client.get("/")
     assert response.status_code == 200
     assert response.json()["status"] == "online"
-    assert "ta" in response.json()["supported_languages"]
+    assert response.json()["pilot_region"] == "Maharashtra"
+    assert "mr" in response.json()["supported_languages"]
 
 def test_register_and_login_farmer():
     reg_res = client.post("/auth/register", json={
-        "phone_or_email": "+919443999888",
+        "phone_or_email": "+919822999888",
         "password_or_otp": "pass1234",
         "role": "farmer",
-        "name": "Kandasamy (Farmer)",
-        "location": "Dindigul, Tamil Nadu",
-        "preferred_language": "ta"
+        "name": "Kashinath (Farmer)",
+        "location": "Nashik, Maharashtra",
+        "preferred_language": "mr"
     })
     assert reg_res.status_code == 200
     data = reg_res.json()
     assert "access_token" in data
     assert data["user"]["role"] == "farmer"
-    assert data["user"]["preferred_language"] == "ta"
+    assert data["user"]["preferred_language"] == "mr"
 
 def test_create_and_list_crops():
     # Register & get token
     reg_res = client.post("/auth/register", json={
-        "phone_or_email": "+919443111222",
+        "phone_or_email": "+919822111222",
         "password_or_otp": "pass1234",
         "role": "farmer",
-        "name": "Murugan",
-        "location": "Madurai, Tamil Nadu",
-        "preferred_language": "ta"
+        "name": "Sanjay Patil",
+        "location": "Pimpalgaon APMC, Nashik",
+        "preferred_language": "mr"
     })
     token = reg_res.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer ${token}"}
 
     lot_res = client.post("/lots", json={
-        "crop": "Drumstick",
+        "crop": "Tomato",
         "quantity": 500.0,
         "quality": "Grade A",
-        "location": "Oddanchatram Mandi",
-        "price_per_kg": 55.0
+        "location": "Pimpalgaon APMC, Nashik",
+        "price_per_kg": 28.5
     }, headers=headers)
     assert lot_res.status_code == 200
-    assert lot_res.json()["crop"] == "Drumstick"
+    assert lot_res.json()["crop"] == "Tomato"
 
     lots_list = client.get("/lots")
     assert lots_list.status_code == 200
@@ -61,7 +62,7 @@ def test_live_market_prices():
     assert res.status_code == 200
     prices = res.json()
     assert len(prices) > 0
-    assert any(p["market"].startswith("Oddanchatram") or p["market"].startswith("Koyambedu") for p in prices)
+    assert any(p["market"].startswith("Nashik") or p["market"].startswith("Mumbai") or p["market"].startswith("Pune") for p in prices)
 
 def test_payment_order_creation_and_verification():
     # Create order

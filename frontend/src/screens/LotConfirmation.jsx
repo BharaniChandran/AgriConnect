@@ -1,11 +1,19 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '../utils/formatters';
 
 export default function LotConfirmation() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation('common');
+  const lot = location.state?.lot || {
+    crop: 'Tomato (Roma)',
+    quantity: 1500,
+    quality: 'Grade A',
+    price_per_kg: 28.5,
+    location: 'Pimpalgaon APMC, Nashik, Maharashtra'
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-5xl mx-auto w-full">
@@ -29,19 +37,19 @@ export default function LotConfirmation() {
             <div className="grid grid-cols-2 gap-y-8 gap-x-6">
               <div className="bg-[#FCFBF9] p-5 rounded-xl border border-[#E8E2D9]">
                 <span className="block font-label-sm font-bold text-[#5B755D] mb-2 uppercase tracking-wider">{t('crop_type') || 'Crop'}</span>
-                <span className="block font-body-lg text-[#154212] font-bold">Tomato (Roma)</span>
+                <span className="block font-body-lg text-[#154212] font-bold">{lot.crop}</span>
               </div>
               <div className="bg-[#FCFBF9] p-5 rounded-xl border border-[#E8E2D9]">
                 <span className="block font-label-sm font-bold text-[#5B755D] mb-2 uppercase tracking-wider">{t('quantity') || 'Quantity'}</span>
-                <span className="block font-body-lg text-[#154212] font-bold">500 kg</span>
+                <span className="block font-body-lg text-[#154212] font-bold">{lot.quantity} kg</span>
               </div>
               <div className="bg-[#FCFBF9] p-5 rounded-xl border border-[#E8E2D9]">
                 <span className="block font-label-sm font-bold text-[#5B755D] mb-2 uppercase tracking-wider">{t('grade') || 'Grade'}</span>
-                <span className="block font-body-lg text-[#154212] font-bold bg-[#EFEBE3] inline-block px-3 py-1 rounded-md">Grade A</span>
+                <span className="block font-body-lg text-[#154212] font-bold bg-[#EFEBE3] inline-block px-3 py-1 rounded-md">{lot.quality || 'Grade A'}</span>
               </div>
               <div className="bg-[#FCFBF9] p-5 rounded-xl border border-[#E8E2D9]">
                 <span className="block font-label-sm font-bold text-[#5B755D] mb-2 uppercase tracking-wider">{t('base_rate') || 'Base Price'}</span>
-                <span className="block font-body-lg text-[#154212] font-bold text-2xl">{formatCurrency(25)} <span className="text-lg font-medium text-[#5B755D]">/ kg</span></span>
+                <span className="block font-body-lg text-[#154212] font-bold text-2xl">{formatCurrency(lot.price_per_kg || 28.5)} <span className="text-lg font-medium text-[#5B755D]">/ kg</span></span>
               </div>
             </div>
           </div>
@@ -56,8 +64,8 @@ export default function LotConfirmation() {
                 <span className="material-symbols-outlined text-[#154212] text-[32px]">map</span>
               </div>
               <div>
-                <h3 className="font-display-sm text-xl font-bold text-[#154212] mb-1">Oddanchatram Mandi</h3>
-                <p className="font-body-md text-[#5B755D] mb-4">Dindigul Regulated Market, Block B, Entry Gate 2.</p>
+                <h3 className="font-display-sm text-xl font-bold text-[#154212] mb-1">{lot.location || 'Pimpalgaon APMC'}</h3>
+                <p className="font-body-md text-[#5B755D] mb-4">Nashik District APMC Market Yard, Gate 1.</p>
                 <button className="inline-flex items-center font-label-lg font-bold text-[#154212] hover:text-[#2A6B25] transition-colors bg-[#F7F4F0] px-4 py-2 rounded-lg">
                   <span className="material-symbols-outlined mr-2 text-[20px]">directions</span>
                   Get Directions

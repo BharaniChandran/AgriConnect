@@ -11,8 +11,17 @@ export default function Settings() {
   };
 
   const getLangName = (code) => {
-    const map = { en: 'English (US)', hi: 'Hindi', ta: 'Tamil', te: 'Telugu', kn: 'Kannada', ml: 'Malayalam' };
-    return map[code] || 'English (US)';
+    const map = { 
+      mr: 'मराठी (Marathi - Maharashtra)', 
+      hi: 'हिन्दी (Hindi)', 
+      en: 'English (US)', 
+      gu: 'ગુજરાતી (Gujarati)', 
+      ta: 'தமிழ் (Tamil)', 
+      te: 'తెలుగు (Telugu)', 
+      kn: 'ಕನ್ನಡ (Kannada)', 
+      ml: 'മലയാളം (Malayalam)' 
+    };
+    return map[code] || 'मराठी (Marathi)';
   };
 
   return (
@@ -30,7 +39,7 @@ export default function Settings() {
             </div>
             <div className="flex-grow flex flex-col justify-center items-center py-10 bg-[#FCFBF9] rounded-xl border border-[#E8E2D9] mb-8">
               <div className="text-center">
-                <span className="font-display-md text-5xl font-bold text-[#154212] block mb-3 uppercase tracking-widest">{i18n.language}</span>
+                <span className="font-display-md text-4xl font-bold text-[#154212] block mb-3 uppercase tracking-widest">{i18n.language}</span>
                 <span className="font-label-lg font-bold text-[#5B755D]">{getLangName(i18n.language)}</span>
               </div>
             </div>

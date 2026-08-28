@@ -105,7 +105,7 @@ def release_payout_to_farmer(farmer_id: str, amount_inr: float, transaction_id: 
     """
     Release payout to the farmer (via Razorpay Route / Payout API).
     """
-    print(f"[Razorpay Payout]: Released ₹{amount_inr} to Farmer #{farmer_id} for Transaction #{transaction_id}")
+    print(f"[Razorpay Payout]: Released INR {amount_inr} to Farmer #{farmer_id} for Transaction #{transaction_id}")
     return {
         "status": "released",
         "farmer_id": farmer_id,

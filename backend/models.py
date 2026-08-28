@@ -42,7 +42,7 @@ class Farmer(Base):
     name = Column(String, nullable=False)
     location = Column(String, nullable=False)
     phone = Column(String, nullable=False)
-    preferred_language = Column(String, default="ta")
+    preferred_language = Column(String, default="mr")
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -55,7 +55,7 @@ class Buyer(Base):
     name = Column(String, nullable=False)
     location = Column(String, nullable=False)
     phone = Column(String, nullable=False)
-    preferred_language = Column(String, default="ta")
+    preferred_language = Column(String, default="mr")
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
